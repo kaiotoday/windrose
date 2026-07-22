@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>StandOrt — Studio Arno</title>
+  <meta name="description" content="StandOrt — Märkte, Festivals und Messen für Studio Arno. Standorte auf Karte und Liste, mit Bewerbungsfristen und Status." />
+  <meta name="theme-color" content="#f7f3ec" />
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"
+        integrity="sha512-Zcn6bjR/8RZbLEpLIeOwNtzREBAJnUKESxces60Mpoj+2okopSAcSUIUOseddDm0cxnGQzxIR7vJgsLZbdLE3w=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- ===================== Login (nur mit Supabase) ===================== -->
+  <div id="auth" class="auth" hidden>
+    <div class="auth-card">
+      <div class="brandmark" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="40" height="40"><use href="#compass" /></svg>
+      </div>
+      <h1 class="auth-title">StandOrt</h1>
+      <p class="auth-sub">Gemeinsam geteilt · Studio Arno</p>
+
+      <form id="auth-form" class="auth-form" autocomplete="on">
+        <div id="auth-step-email">
+          <label for="auth-email">E-Mail</label>
+          <input id="auth-email" type="email" inputmode="email" autocomplete="email" placeholder="du@studioarno.ch" required />
+          <button type="submit" id="auth-send" class="btn btn-primary btn-block">Code senden</button>
+          <p class="auth-hint">Du bekommst einen 6-stelligen Code (oder einen Magic-Link) per E-Mail. Nur freigeschaltete Adressen haben Zugriff.</p>
+        </div>
+        <div id="auth-step-code" hidden>
+          <label for="auth-code">Code aus der E-Mail</label>
+          <input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="123456" />
+          <button type="button" id="auth-verify" class="btn btn-primary btn-block">Anmelden</button>
+          <button type="button" id="auth-back" class="btn btn-ghost btn-block">Andere E-Mail</button>
+        </div>
+        <p id="auth-msg" class="auth-msg" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ Verbindungsfehler (Supabase konfiguriert, aber nicht erreichbar) ============ -->
+  <div id="connError" class="auth" hidden>
+    <div class="auth-card">
+      <div class="brandmark" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="40" height="40"><use href="#compass" /></svg>
+      </div>
+      <h1 class="auth-title" id="connErrorTitle">Verbindung fehlgeschlagen</h1>
+      <p class="auth-sub">Studio Arno · StandOrt</p>
+      <p class="conn-error-text" id="connErrorText">Verbindung zum Server fehlgeschlagen. Bitte Internetverbindung prüfen und erneut versuchen.</p>
+      <button type="button" id="connRetry" class="btn btn-primary btn-block">Erneut versuchen</button>
+    </div>
+  </div>
+
+  <!-- ===================== App ===================== -->
+  <div id="app" class="app" hidden>
+    <header class="masthead">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" width="34" height="34"><use href="#compass" /></svg>
+        </span>
+        <span class="brand-text">
+          <span class="brand-name">StandOrt</span>
+          <span class="brand-sub">Studio Arno · Märkte, Festivals &amp; Messen</span>
+        </span>
+      </div>
+      <div class="account">
+        <span id="demoBadge" class="demo-badge" hidden>Demo-Modus · nicht geteilt</span>
+        <span id="userEmail" class="user-email" hidden></span>
+        <button id="btnLogout" class="btn btn-ghost btn-sm" hidden>Abmelden</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <!-- Liste -->
+      <section class="panel panel-list" id="panel-list" aria-label="Liste">
+        <div class="list-head">
+          <div class="search-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M10.5 3a7.5 7.5 0 1 0 4.55 13.46l4.24 4.24 1.42-1.42-4.24-4.24A7.5 7.5 0 0 0 10.5 3zm0 2a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11z"/></svg>
+            <input id="search" type="search" placeholder="Name oder Ort suchen…" aria-label="Suche" />
+          </div>
+          <div class="list-head-controls">
+            <label class="sort-wrap">
+              <span class="sort-label">Sortierung</span>
+              <select id="sort" aria-label="Sortierung">
+                <option value="deadline">Nach Deadline</option>
+                <option value="event">Nach Termin</option>
+                <option value="name">Nach Name</option>
+              </select>
+            </label>
+            <div class="segmented" id="archivToggle" role="tablist" aria-label="Ansicht">
+              <button class="seg-btn is-on" data-archiv="0" role="tab" aria-selected="true">Aktiv</button>
+              <button class="seg-btn" data-archiv="1" role="tab" aria-selected="false">Archiv</button>
+            </div>
+            <button id="btnAddDesktop" class="btn btn-primary btn-sm">+ Eintrag</button>
+          </div>
+        </div>
+
+        <div class="filters">
+          <div class="chip-row" id="catFilters" aria-label="Kategorien">
+            <button class="chip cat-festival is-on" data-cat="festival"><span class="chip-dot"></span>Festivals</button>
+            <button class="chip cat-markt is-on" data-cat="markt"><span class="chip-dot"></span>Märkte</button>
+            <button class="chip cat-messe is-on" data-cat="messe"><span class="chip-dot"></span>Messen</button>
+            <button class="chip cat-sonstiges is-on" data-cat="sonstiges"><span class="chip-dot"></span>Sonstiges</button>
+          </div>
+          <div class="chip-row" id="statusFilters" aria-label="Status">
+            <button class="chip status-chip is-on" data-status="all">Alle Status</button>
+            <button class="chip status-chip" data-status="offen">Offen</button>
+            <button class="chip status-chip" data-status="beworben">Beworben</button>
+            <button class="chip status-chip" data-status="wartet">Wartet</button>
+            <button class="chip status-chip" data-status="zugesagt">Zugesagt</button>
+            <button class="chip status-chip" data-status="abgesagt">Abgesagt</button>
+            <button class="chip status-chip" data-status="verpasst">Verpasst</button>
+          </div>
+        </div>
+
+        <div class="deadline-strip" id="deadlineStrip" hidden>
+          <div class="deadline-strip-head">
+            <span class="strip-title">Nächste Deadlines</span>
+          </div>
+          <div class="deadline-tags" id="deadlineTags"></div>
+        </div>
+
+        <div class="rows" id="rows"></div>
+      </section>
+
+      <!-- Karte -->
+      <section class="panel panel-map" id="panel-map" aria-label="Karte">
+        <div id="map"></div>
+        <div class="legend" id="legend">
+          <span class="legend-item"><span class="legend-dot cat-festival"></span>Festival</span>
+          <span class="legend-item"><span class="legend-dot cat-markt"></span>Markt</span>
+          <span class="legend-item"><span class="legend-dot cat-messe"></span>Messe</span>
+          <span class="legend-item"><span class="legend-dot cat-sonstiges"></span>Sonstiges</span>
+          <span class="legend-sep"></span>
+          <span class="legend-item"><span class="legend-ring ring-amber"></span>Frist diesen Monat</span>
+          <span class="legend-item"><span class="legend-ring ring-red"></span>Frist abgelaufen</span>
+        </div>
+        <div class="pick-banner" id="pickBanner" hidden>
+          <span>Tippe auf die Karte, um die Position zu setzen. Den Punkt kannst du verschieben.</span>
+          <button class="btn btn-primary btn-sm" id="pickDone">Fertig</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Mobile-Tableiste -->
+    <nav class="tabbar" aria-label="Ansicht wechseln">
+      <button class="tab" data-tab="map" aria-current="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 9 6 4 4.2v14.5L9 20.5l6-2 5 1.8V5.8L15 4zm-6 3.5 6-2v11l-6 2v-11z"/></svg>
+        <span>Karte</span>
+      </button>
+      <button class="tab" data-tab="list">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h16v2H4v-2z"/></svg>
+        <span>Liste</span>
+      </button>
+      <button class="tab tab-add" data-tab="add">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/></svg>
+        <span>Neu</span>
+      </button>
+      <button class="tab" data-tab="archiv">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v3H4V5zm1 5h14v9H5v-9zm4 2v2h6v-2H9z"/></svg>
+        <span>Archiv</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ===================== Scrim + Sheets ===================== -->
+  <div id="scrim" class="scrim" hidden></div>
+
+  <!-- Detail -->
+  <aside id="detail" class="sheet sheet-detail" aria-label="Detail" hidden>
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <span class="sheet-kicker" id="detailKicker"></span>
+      <button class="icon-btn sheet-close" data-close="detail" aria-label="Schließen">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6z"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body" id="detailBody"></div>
+  </aside>
+
+  <!-- Formular -->
+  <aside id="form" class="sheet sheet-form" aria-label="Eintrag bearbeiten" hidden>
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <span class="sheet-kicker" id="formTitle">Neuer Eintrag</span>
+      <button class="icon-btn sheet-close" data-close="form" aria-label="Schließen">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6z"/></svg>
+      </button>
+    </div>
+    <form class="sheet-body form-body" id="entryForm">
+      <input type="hidden" id="f-id" />
+
+      <!-- Konflikt-Leiste: erscheint, wenn beim Speichern eine gleichzeitige
+           Fremdänderung erkannt wurde (nur geteilter Modus). -->
+      <div class="form-conflict field-full" id="formConflict" role="alert" hidden>
+        <p class="form-conflict-text">Diese/r Eintrag wurde inzwischen von der anderen Person geändert. Deine Eingaben wurden noch nicht gespeichert.</p>
+        <div class="form-conflict-actions">
+          <button type="button" class="btn btn-soft btn-sm" id="f-conflict-reload">Neu laden</button>
+          <button type="button" class="btn btn-primary btn-sm" id="f-conflict-overwrite">Trotzdem überschreiben</button>
+        </div>
+      </div>
+
+      <div class="field field-full">
+        <label for="f-name">Name</label>
+        <input id="f-name" type="text" placeholder="z.B. Marché du Lez" required />
+      </div>
+
+      <div class="field">
+        <label for="f-cat">Kategorie</label>
+        <select id="f-cat">
+          <option value="festival">Festival</option>
+          <option value="markt">Markt</option>
+          <option value="messe">Messe</option>
+          <option value="sonstiges">Sonstiges</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-status">Status</label>
+        <select id="f-status">
+          <option value="offen">Offen</option>
+          <option value="beworben">Beworben</option>
+          <option value="wartet">Wartet</option>
+          <option value="zugesagt">Zugesagt</option>
+          <option value="abgesagt">Abgesagt</option>
+        </select>
+      </div>
+
+      <fieldset class="field-full location-box">
+        <legend>Position</legend>
+
+        <div class="loc-search">
+          <label for="f-geosearch">Ort suchen</label>
+          <div class="geo-search-row">
+            <input id="f-geosearch" type="text" placeholder="Stadt, Adresse oder Ort…" autocomplete="off" />
+            <button type="button" class="btn btn-soft btn-sm" id="f-geosearchBtn">Suchen</button>
+          </div>
+          <div class="geo-suggest" id="f-geosuggest" hidden></div>
+        </div>
+
+        <div class="loc-actions">
+          <button type="button" class="btn btn-soft btn-sm" id="f-pickmap">Auf Karte wählen</button>
+        </div>
+
+        <div class="loc-paste">
+          <label for="f-paste">Link oder Koordinaten einfügen</label>
+          <input id="f-paste" type="text" placeholder="Google-/Apple-Maps-Link oder „47.37, 8.54“" autocomplete="off" />
+          <p class="hint" id="f-pastehint">Aus Google Maps, Apple Maps oder als „lat, lng“. Kurzlinks (maps.app.goo.gl) vorher im Browser öffnen und die vollständige URL kopieren.</p>
+        </div>
+
+        <div class="loc-coords">
+          <div class="field">
+            <label for="f-lat">Breitengrad (lat)</label>
+            <input id="f-lat" type="text" inputmode="decimal" placeholder="47.3769" required />
+          </div>
+          <div class="field">
+            <label for="f-lng">Längengrad (lng)</label>
+            <input id="f-lng" type="text" inputmode="decimal" placeholder="8.5417" required />
+          </div>
+          <div class="field">
+            <label for="f-city">Stadt</label>
+            <input id="f-city" type="text" placeholder="Zürich" />
+          </div>
+          <div class="field">
+            <label for="f-country">Land</label>
+            <input id="f-country" type="text" placeholder="Schweiz" />
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="field field-full">
+        <label for="f-dates">Termin (Text)</label>
+        <input id="f-dates" type="text" placeholder="z.B. 20.–22. November 2026" />
+      </div>
+      <div class="field">
+        <label for="f-event-start">Termin von</label>
+        <input id="f-event-start" type="date" />
+      </div>
+      <div class="field">
+        <label for="f-event-end">Termin bis</label>
+        <input id="f-event-end" type="date" />
+      </div>
+
+      <div class="field">
+        <label for="f-deadline">Deadline</label>
+        <input id="f-deadline" type="date" />
+      </div>
+      <div class="field">
+        <label for="f-deadlinetext">Deadline-Notiz</label>
+        <input id="f-deadlinetext" type="text" placeholder="z.B. laufend, ab August" />
+      </div>
+
+      <div class="field field-full">
+        <label for="f-link">Link zur Anmeldung</label>
+        <input id="f-link" type="url" placeholder="https://…" />
+      </div>
+      <div class="field field-full">
+        <label for="f-contact">Kontakt</label>
+        <input id="f-contact" type="text" placeholder="E-Mail oder Person" />
+      </div>
+      <div class="field field-full">
+        <label for="f-cost">Kosten / Standgebühr</label>
+        <input id="f-cost" type="text" placeholder="z.B. 180 € Standgebühr" />
+      </div>
+      <div class="field field-full">
+        <label for="f-note">Notiz</label>
+        <textarea id="f-note" rows="3" placeholder="Kurze Einordnung…"></textarea>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-close="form">Abbrechen</button>
+        <button type="submit" class="btn btn-primary" id="f-save">Speichern</button>
+      </div>
+    </form>
+  </aside>
+
+  <!-- Toasts -->
+  <div id="toasts" class="toasts" aria-live="polite" aria-atomic="false"></div>
+
+  <!-- Inline-SVG-Symbole -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="compass" viewBox="0 0 48 48">
+      <circle cx="24" cy="24" r="21" fill="none" stroke="currentColor" stroke-width="2"/>
+      <circle cx="24" cy="24" r="2.4" fill="currentColor"/>
+      <path d="M24 6 L28 22 L24 24 z" fill="currentColor"/>
+      <path d="M24 42 L20 26 L24 24 z" fill="currentColor" opacity="0.45"/>
+      <path d="M24 24 L24 24 M6 24 h4 M38 24 h4 M24 6 v4 M24 38 v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+  </svg>
+
+  <!-- ===================== Scripts ===================== -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"
+          integrity="sha512-BwHfrr4c9kmRkLw6iXFdzcdWV/PGkVgiIyIWLLlTSXzWQzxuSg4DiQUCpauz/EWjgk5TYQqX/kvn9pG1NpYfqg=="
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="config.js"></script>
+  <script src="seed.js"></script>
+  <!-- supabase-js lokal gepinnt (kein Laufzeit-CDN). Muss VOR data.js geladen
+       werden; data.js nutzt den globalen window.supabase.createClient. -->
+  <script src="vendor/supabase-2.110.8.min.js"></script>
+  <script src="data.js"></script>
+  <script src="map.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

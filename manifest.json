@@ -1,0 +1,16 @@
+{
+  "name": "StandOrt — Studio Arno",
+  "short_name": "StandOrt",
+  "description": "Märkte, Festivals und Messen für Studio Arno — auf Karte und Liste, mit Bewerbungsfristen und Status.",
+  "lang": "de",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f3ec",
+  "theme_color": "#f7f3ec",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

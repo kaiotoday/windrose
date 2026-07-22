@@ -1,0 +1,63 @@
+name: Supabase Keepalive
+
+# Hält das Supabase-Projekt (Free-Tier) aktiv, indem einmal täglich der
+# REST-Endpunkt angepingt wird. Ohne Aktivität pausiert Supabase das Projekt.
+#
+# Voraussetzung (im GitHub-Repo unter Settings → Secrets and variables → Actions):
+#   - Repository VARIABLE  SUPABASE_URL       z.B. https://abcxyz.supabase.co
+#   - Repository SECRET    SUPABASE_ANON_KEY  der öffentliche anon-Key
+# Sind beide nicht gesetzt, wird der Job sauber übersprungen (kein Fehler).
+#
+# Erfolg gilt AUSSCHLIESSLICH bei HTTP 2xx. Alles andere (inkl. 000/Timeout)
+# wird nach einem zweiten Versuch als Fehlschlag gewertet.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"   # täglich 06:17 UTC
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -u
+          if [ -z "${SUPABASE_URL}" ] || [ -z "${SUPABASE_ANON_KEY}" ]; then
+            echo "SUPABASE_URL (Variable) oder SUPABASE_ANON_KEY (Secret) fehlt — übersprungen."
+            exit 0
+          fi
+          # REST-Wurzel: liefert für den anon-Key eine 2xx-Antwort, ohne dass
+          # anon Tabellenzugriff braucht (RLS/Grants lassen anon nichts lesen).
+          url="${SUPABASE_URL%/}/rest/v1/"
+          echo "Pinge ${url}"
+
+          ping() {
+            curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$url" \
+              -H "apikey: ${SUPABASE_ANON_KEY}" \
+              -H "Authorization: Bearer ${SUPABASE_ANON_KEY}"
+          }
+
+          # GitHub führt den Schritt mit `bash -eo pipefail` aus. Schlägt curl hart
+          # fehl (z.B. Timeout → Exit 28), würde `code=$(ping)` den Schritt via -e
+          # sofort abbrechen — die Wiederholung käme nie. Deshalb `|| code=000`:
+          # bei hartem Fehler behalten/erzwingen wir 000 und laufen weiter.
+          code=$(ping) || code=000
+          echo "Versuch 1: HTTP ${code}"
+          case "$code" in
+            2??) echo "Supabase erreichbar (Projekt aktiv)."; exit 0 ;;
+          esac
+
+          echo "Kein 2xx — ein erneuter Versuch in 5s…"
+          sleep 5
+          code=$(ping) || code=000
+          echo "Versuch 2: HTTP ${code}"
+          case "$code" in
+            2??) echo "Supabase erreichbar (Projekt aktiv)."; exit 0 ;;
+          esac
+
+          echo "Keepalive fehlgeschlagen (letzter Status: ${code})."
+          exit 1

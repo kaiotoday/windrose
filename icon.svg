@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="StandOrt">
+  <rect width="512" height="512" rx="96" fill="#f2ead9"/>
+  <rect x="24" y="24" width="464" height="464" rx="76" fill="none" stroke="#241f2b" stroke-width="6" stroke-dasharray="14 12" opacity="0.35"/>
+  <g transform="translate(256 256)">
+    <circle r="150" fill="#fffdf9" stroke="#241f2b" stroke-width="10"/>
+    <!-- Himmelsrichtungs-Ticks -->
+    <g stroke="#241f2b" stroke-width="8" stroke-linecap="round">
+      <line x1="0" y1="-150" x2="0" y2="-124"/>
+      <line x1="0" y1="150" x2="0" y2="124"/>
+      <line x1="-150" y1="0" x2="-124" y2="0"/>
+      <line x1="150" y1="0" x2="124" y2="0"/>
+    </g>
+    <!-- Nadel -->
+    <path d="M0 -112 L34 0 L0 22 Z" fill="#241f2b"/>
+    <path d="M0 112 L-34 0 L0 -22 Z" fill="#8b5cc7"/>
+    <circle r="15" fill="#fffdf9" stroke="#241f2b" stroke-width="7"/>
+  </g>
+</svg>
