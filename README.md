@@ -125,15 +125,17 @@ Dinge in Supabase stimmen:
    (z.B. `https://euername.github.io/windrose/`). Sonst zeigen die Magic-Links
    ins Leere. Die App gibt beim Anmelden zusätzlich die aktuelle Seiten-URL als
    `emailRedirectTo` mit.
-2. **Magic-Link-Vorlage anpassen.** Unter **Authentication → Email Templates →
-   „Magic Link"** muss die Vorlage den Platzhalter **`{{ .Token }}`** enthalten
-   — das ist der 6-stellige Code. Fehlt er, bekommen die Nutzer nur einen Link
-   und können den Code nicht eintippen. Beispiel:
+2. **E-Mail-Vorlagen anpassen.** Unter **Authentication → Email Templates**
+   müssen **ZWEI** Vorlagen den Platzhalter **`{{ .Token }}`** (den 6-stelligen
+   Code) enthalten — sonst bekommen die Nutzer nur einen Link und können nichts
+   eintippen:
+   - **„Confirm signup"** — kommt bei der **ersten** Anmeldung einer Adresse
+   - **„Magic Link"** — kommt bei jeder weiteren Anmeldung
 
-   ```html
-   <p>Dein Anmelde-Code für Windrose: <strong>{{ .Token }}</strong></p>
-   <p>Oder direkt anmelden: <a href="{{ .ConfirmationURL }}">Anmelden</a></p>
-   ```
+   Für beide dieselbe fertige, schön gestaltete Vorlage aus
+   [`db/email-template.html`](db/email-template.html) einfügen
+   (kompletten Inhalt der Datei in das Template-Feld kopieren).
+   Betreff jeweils: `Dein Windrose-Code`.
 
 **Neue Konten sperren (empfohlen):** In `config.js` steht `shouldCreateUser: true`,
 damit sich Leandra und Arno **das erste Mal** anmelden (und ihr Konto entsteht)

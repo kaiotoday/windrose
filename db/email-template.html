@@ -1,0 +1,26 @@
+<!-- ============================================================================
+  Windrose — E-Mail-Vorlage für den Anmelde-Code (Supabase Auth)
+  ----------------------------------------------------------------------------
+  Diese Vorlage in BEIDE Supabase-Templates einfügen (Dashboard → Authentication
+  → Emails/Templates):
+    1. "Confirm signup"  (erste Anmeldung einer neuen Adresse)
+    2. "Magic Link"      (jede weitere Anmeldung)
+  Betreff jeweils:  Dein Windrose-Code
+  {{ .Token }} wird von Supabase durch den 6-stelligen Code ersetzt.
+  Nur Inline-Styles, E-Mail-Client-sicher (Gmail, Proton, Apple Mail).
+============================================================================ -->
+<div style="margin:0;padding:32px 16px;background-color:#f7f3ec;">
+  <div style="max-width:440px;margin:0 auto;background-color:#fffdf9;border:1px solid #e4ddd0;border-radius:16px;padding:36px 32px;text-align:center;">
+    <div style="font-size:30px;line-height:1;">&#129517;</div>
+    <div style="font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:bold;color:#241f2b;letter-spacing:-0.5px;margin-top:8px;">Windrose</div>
+    <div style="font-family:Helvetica,Arial,sans-serif;font-size:13px;color:#5a5264;margin-top:2px;">Studio Arno unterwegs</div>
+    <div style="font-family:Helvetica,Arial,sans-serif;margin:28px 0 10px;font-size:14px;color:#5a5264;">Dein Anmelde-Code:</div>
+    <div style="font-family:'Courier New',monospace;font-size:40px;font-weight:bold;letter-spacing:8px;color:#241f2b;background-color:#efe7d9;border-radius:12px;padding:18px 10px;">{{ .Token }}</div>
+    <div style="font-family:Helvetica,Arial,sans-serif;margin-top:22px;font-size:13px;color:#5a5264;line-height:1.5;">
+      Gib diesen Code in der Windrose-App ein.<br>Er ist eine Stunde lang g&uuml;ltig.
+    </div>
+    <div style="font-family:Helvetica,Arial,sans-serif;margin-top:26px;padding-top:18px;border-top:1px solid #e4ddd0;font-size:12px;color:#8b8496;">
+      Nicht angefordert? Dann kannst du diese Mail einfach ignorieren.
+    </div>
+  </div>
+</div>
