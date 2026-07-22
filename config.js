@@ -1,7 +1,7 @@
 /*
- * StandOrt — Konfiguration
+ * Windrose — Konfiguration
  *
- * Trag hier die Zugangsdaten deines Supabase-Projekts ein, damit StandOrt die
+ * Trag hier die Zugangsdaten deines Supabase-Projekts ein, damit Windrose die
  * Standorte zwischen Leandra und Arno teilt (statt nur lokal im Browser).
  *
  *   supabaseUrl     = die Projekt-URL, z.B. "https://abcxyz.supabase.co"

@@ -1,5 +1,5 @@
 -- ============================================================================
--- StandOrt — Supabase Setup (idempotent)
+-- Windrose — Supabase Setup (idempotent)
 -- ----------------------------------------------------------------------------
 -- Im Supabase SQL-Editor ausführen. Kann gefahrlos mehrfach ausgeführt werden.
 -- Danach db/seed.sql laufen lassen und unten die erlaubten E-Mails eintragen.

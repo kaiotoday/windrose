@@ -1,4 +1,4 @@
--- StandOrt — Seed-Daten (idempotent)
+-- Windrose — Seed-Daten (idempotent)
 -- Generiert aus seed.js. Nach db/setup.sql im Supabase SQL-Editor ausführen.
 -- Erneutes Ausführen ist gefahrlos: bestehende Zeilen (gleiche id) bleiben
 -- unverändert, deine eigenen Bearbeitungen werden NICHT überschrieben.

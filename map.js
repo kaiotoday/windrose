@@ -1,5 +1,5 @@
 /* ============================================================================
-   StandOrt — Kartenmodul (Leaflet 1.9, Carto-Light-Tiles)
+   Windrose — Kartenmodul (Leaflet 1.9, Carto-Light-Tiles)
    Marker nach Kategorie eingefärbt, Deadline-Dringlichkeit als Ring.
    Einträge an identischen Koordinaten werden deterministisch versetzt.
    ========================================================================== */

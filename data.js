@@ -1,5 +1,5 @@
 /* ============================================================================
-   StandOrt — Datenschicht
+   Windrose — Datenschicht
    Store-Abstraktion: Demo-Modus (localStorage + Seed) ODER Supabase (geteilt).
    Dazu Helfer für Escaping, Datum und Status.
    ========================================================================== */

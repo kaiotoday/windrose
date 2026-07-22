@@ -1,4 +1,4 @@
-# StandOrt
+# Windrose
 
 **Studio Arno · Märkte, Festivals & Messen**
 
@@ -76,7 +76,7 @@ So spielt ihr Änderungen ein, ohne die Kommandozeile:
 2. Bei **„Build and deployment"** als Source **„Deploy from a branch"** wählen.
 3. Branch **`main`** und Ordner **`/ (root)`** auswählen, **Save**.
 4. Nach kurzer Zeit erscheint oben die öffentliche Adresse
-   (z.B. `https://euername.github.io/standort/`).
+   (z.B. `https://euername.github.io/windrose/`).
 
 ---
 
@@ -122,7 +122,7 @@ Dinge in Supabase stimmen:
 
 1. **Site URL setzen.** Unter **Authentication → URL Configuration** die
    **Site URL** auf eure GitHub-Pages-Adresse setzen
-   (z.B. `https://euername.github.io/standort/`). Sonst zeigen die Magic-Links
+   (z.B. `https://euername.github.io/windrose/`). Sonst zeigen die Magic-Links
    ins Leere. Die App gibt beim Anmelden zusätzlich die aktuelle Seiten-URL als
    `emailRedirectTo` mit.
 2. **Magic-Link-Vorlage anpassen.** Unter **Authentication → Email Templates →
@@ -131,7 +131,7 @@ Dinge in Supabase stimmen:
    und können den Code nicht eintippen. Beispiel:
 
    ```html
-   <p>Dein Anmelde-Code für StandOrt: <strong>{{ .Token }}</strong></p>
+   <p>Dein Anmelde-Code für Windrose: <strong>{{ .Token }}</strong></p>
    <p>Oder direkt anmelden: <a href="{{ .ConfirmationURL }}">Anmelden</a></p>
    ```
 

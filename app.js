@@ -1,5 +1,5 @@
 /* ============================================================================
-   StandOrt — App-Logik (UI, Filter, Detail, Formular, Auth, Anhänge)
+   Windrose — App-Logik (UI, Filter, Detail, Formular, Auth, Anhänge)
    Klassisches Script, teilt sich window.SO mit data.js und map.js.
    ========================================================================== */
 (function (SO) {

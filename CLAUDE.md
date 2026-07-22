@@ -1,4 +1,4 @@
-# StandOrt — Hinweise für Claude Code
+# Windrose — Hinweise für Claude Code
 
 Kurze Orientierung für künftige Sessions an dieser App (Leandra & Arno,
 Studio Arno). Antworten bitte auf Deutsch, knapp.
@@ -43,10 +43,10 @@ Vor jedem Push kurz testen: lädt die Seite, keine Fehler in der Browser-Konsole
 öffentliche Seite (GitHub Pages, `main` / root) aktualisiert sich danach selbst.
 
 ## Betrieb & Rollen (wichtig für Sessions mit Leandra oder Arno)
-- **Live-App:** https://kaiotoday.github.io/standort/ — Login mit der eigenen
+- **Live-App:** https://kaiotoday.github.io/windrose/ — Login mit der eigenen
   E-Mail, der 6-stellige Code kommt per Mail. Einträge, Status, PDFs: alles
   direkt in der App, dafür braucht es weder GitHub noch Supabase.
-- **Admin ist Kaio.** GitHub-Repo (`kaiotoday/standort`) und das
+- **Admin ist Kaio.** GitHub-Repo (`kaiotoday/windrose`) und das
   Supabase-Projekt gehören ihm. Diese Dinge in Sessions mit Leandra/Arno
   **nie** anfassen oder zu ändern versuchen — stattdessen sagen:
   «Das macht Kaio, schreib ihm kurz.» Konkret betrifft das:
