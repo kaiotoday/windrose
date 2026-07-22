@@ -41,3 +41,23 @@ Vor jedem Push kurz testen: lädt die Seite, keine Fehler in der Browser-Konsole
 ## Vor dem Veröffentlichen
 Über **GitHub Desktop** committen und pushen. Erst testen, dann pushen — die
 öffentliche Seite (GitHub Pages, `main` / root) aktualisiert sich danach selbst.
+
+## Betrieb & Rollen (wichtig für Sessions mit Leandra oder Arno)
+- **Live-App:** https://kaiotoday.github.io/standort/ — Login mit der eigenen
+  E-Mail, der 6-stellige Code kommt per Mail. Einträge, Status, PDFs: alles
+  direkt in der App, dafür braucht es weder GitHub noch Supabase.
+- **Admin ist Kaio.** GitHub-Repo (`kaiotoday/standort`) und das
+  Supabase-Projekt gehören ihm. Diese Dinge in Sessions mit Leandra/Arno
+  **nie** anfassen oder zu ändern versuchen — stattdessen sagen:
+  «Das macht Kaio, schreib ihm kurz.» Konkret betrifft das:
+  - neue E-Mail-Adresse für den Login freischalten
+  - alles im Supabase-Dashboard (Datenbank, Auth-Einstellungen, Storage)
+  - GitHub-Einstellungen (Pages, Secrets, Collaborators)
+- **Code-Änderungen** (neue Funktionen, Design, Texte) dürfen Leandra & Arno
+  mit Claude Code machen: ändern → lokal testen (siehe oben) → über GitHub
+  Desktop committen und pushen. Die Live-Seite aktualisiert sich von selbst.
+- Die Datenbank wird von einem automatischen wöchentlichen Ping wachgehalten
+  (GitHub Action `keepalive.yml`) — nichts zu tun.
+- Wenn die App «Verbindung zum Server fehlgeschlagen» zeigt: zuerst eigenes
+  Internet prüfen, dann Kaio Bescheid geben (Supabase-Projekt könnte pausiert
+  sein).

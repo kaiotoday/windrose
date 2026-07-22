@@ -21,7 +21,7 @@
  *                              keine fremde Adresse mehr ein Konto anlegen.
  */
 window.STANDORT_CONFIG = {
-  supabaseUrl: "",
-  supabaseAnonKey: "",
+  supabaseUrl: "https://vbtucmcgroxqnsrjmrgv.supabase.co",
+  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZidHVjbWNncm94cW5zcmptcmd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MzE4MjcsImV4cCI6MjEwMDMwNzgyN30.JW-E98w-UfFCN_8Z0Aq2rd-QFoT2EBQ5wlPJC4Xc9qw",
   shouldCreateUser: true
 };
