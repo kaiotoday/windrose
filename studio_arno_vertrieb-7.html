@@ -1,0 +1,405 @@
+<style>
+:root{
+  --ink:#241f2b; --ink-soft:#5a5264;
+  --paper:#faf8f4; --card:#ffffff;
+  --line:#e2ddd3;
+  --sage:#3fa898; --sage-dark:#0f6d60; --sage-bg:#dcf2ee;
+  --clay:#a97fd6; --clay-dark:#6a3fa0; --clay-bg:#ece0f9;
+  --gold:#e8639a; --gold-dark:#a92868; --gold-bg:#fbe1ec;
+  --amber:#ff8a1f; --amber-dark:#b4570a; --amber-bg:#ffe6ca;
+  --red:#e6392b; --red-dark:#9c2015; --red-bg:#fbdcd7;
+  --grey:#96907f; --grey-dark:#5b564a; --grey-bg:#eae5da;
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
+}
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+.aw *{box-sizing:border-box;}
+.aw{color:var(--ink); background:var(--paper); border-radius:16px; padding:1.5rem; border:1px solid var(--line);}
+.aw h1{font-family:'Fraunces',serif; font-weight:500; font-size:22px; margin:0 0 2px; letter-spacing:-.01em;}
+.aw .sub{font-size:12.5px; color:var(--ink-soft); margin:0 0 1.1rem;}
+.tabbar{display:flex; gap:6px; margin-bottom:1rem;}
+.tabbtn{font-family:'Fraunces',serif; font-size:13.5px; padding:7px 16px; border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--ink-soft); cursor:pointer;}
+.tabbtn.active{background:var(--ink); color:var(--paper); border-color:var(--ink);}
+.filterbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:1rem;}
+.chip{font-size:12.5px; padding:6px 13px; border-radius:999px; border:1px solid var(--line); background:var(--card); cursor:pointer; color:var(--ink-soft); white-space:nowrap;}
+.chip[data-on="1"]{background:var(--sage-dark); border-color:var(--sage-dark); color:#fff;}
+.chip.sonst[data-on="1"]{background:var(--gold-dark); border-color:var(--gold-dark);}
+.chip.fest[data-on="1"]{background:var(--clay-dark); border-color:var(--clay-dark);}
+.spacer{flex:1;}
+.chip.ghostbtn{background:transparent;}
+.legend{display:flex; gap:14px; font-size:11px; color:var(--ink-soft); margin:0 0 1rem; flex-wrap:wrap;}
+.dot{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:1px;}
+#mapview{display:block;}
+#map{width:100%; height:420px; border-radius:12px; border:1px solid var(--line);}
+#listview{display:none;}
+.list-controls{display:flex; align-items:center; gap:10px; margin-bottom:.8rem;}
+.sortbtn{font-size:12.5px; padding:6px 13px; border-radius:999px; border:1px solid var(--line); background:var(--card); cursor:pointer; color:var(--ink-soft);}
+.sortbtn[data-on="1"]{background:var(--amber-dark); border-color:var(--amber-dark); color:#fff;}
+.rows{display:flex; flex-direction:column; gap:8px;}
+.row{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 14px; display:grid; grid-template-columns:14px 1fr auto; gap:12px; align-items:center;}
+.row .catdot{width:10px; height:10px; border-radius:50%; margin-top:3px;}
+.row .name{font-family:'Fraunces',serif; font-size:15px; font-weight:500; margin:0 0 2px;}
+.row .meta{font-size:12px; color:var(--ink-soft); display:flex; gap:10px; flex-wrap:wrap;}
+.row .meta span{white-space:nowrap;}
+.badge{font-size:10.5px; padding:2px 8px; border-radius:999px; font-family:'IBM Plex Mono',monospace; white-space:nowrap;}
+.badge.thismonth{background:var(--amber-bg); color:var(--amber-dark);}
+.badge.passed{background:var(--red-bg); color:var(--red-dark);}
+.badge.upcoming{background:var(--sage-bg); color:var(--sage-dark);}
+.badge.rolling{background:var(--grey-bg); color:var(--grey-dark);}
+.rowactions{display:flex; gap:8px;}
+.iconbtn{border:1.5px solid var(--line); background:var(--card); border-radius:8px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--ink-soft); font-size:17px;}
+.iconbtn.archive{background:var(--sage-bg); border-color:var(--sage); color:var(--sage-dark);}
+.iconbtn.archive:hover{background:var(--sage); color:#fff;}
+.iconbtn.danger{background:var(--red-bg); border-color:var(--red); color:var(--red-dark);}
+.iconbtn.danger:hover{background:var(--red); color:#fff;}
+.empty{text-align:center; padding:2.5rem 1rem; color:var(--ink-soft); font-size:13.5px;}
+.addbar{margin-top:1rem;}
+.addbtn{font-family:'Fraunces',serif; font-size:13.5px; padding:9px 18px; border-radius:10px; border:1px solid var(--ink); background:var(--ink); color:var(--paper); cursor:pointer;}
+.addbtn.secondary{background:var(--card); color:var(--ink); border:1px solid var(--line);}
+.formcard{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-top:12px; display:none;}
+.formcard.open{display:block;}
+.formgrid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+.formgrid label{font-size:11.5px; color:var(--ink-soft); display:block; margin-bottom:3px;}
+.formgrid input, .formgrid select{width:100%; font-size:13px; padding:7px 9px; border-radius:7px; border:1px solid var(--line); background:var(--paper); font-family:inherit; color:var(--ink);}
+.formgrid .full{grid-column:1/-1;}
+.formactions{display:flex; gap:8px; margin-top:12px; justify-content:flex-end;}
+.hint{font-size:10.5px; color:var(--grey-dark); margin-top:3px;}
+.leaflet-popup-content-wrapper{border-radius:10px; font-family:'IBM Plex Sans',sans-serif;}
+.leaflet-popup-content{font-size:12.5px; margin:10px 12px;}
+.popname{font-family:'Fraunces',serif; font-size:14px; font-weight:500; margin:0 0 4px;}
+.poplink{color:var(--clay-dark);}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/2.47.0/iconfont/tabler-icons.min.css">
+
+<div class="aw">
+  <h1>Studio Arno</h1>
+  <p class="sub">Märkte, Festivals und Sonstiges</p>
+
+  <div class="tabbar">
+    <button class="tabbtn active" id="tab-map">Karte</button>
+    <button class="tabbtn" id="tab-list">Liste</button>
+    <button class="tabbtn" id="tab-archiv" style="margin-left:auto;">Archiv</button>
+  </div>
+
+  <div class="filterbar" id="filterbar">
+    <button class="chip fest" data-cat="festival" data-on="1">Festivals</button>
+    <button class="chip" data-cat="markt" data-on="1">Märkte</button>
+    <button class="chip sonst" data-cat="sonstiges" data-on="1">Sonstiges</button>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--amber);"></span>Deadline diesen Monat</span>
+    <span><span class="dot" style="background:var(--red);"></span>Deadline abgelaufen</span>
+    <span><span class="dot" style="background:var(--clay);"></span>Festival</span>
+    <span><span class="dot" style="background:var(--sage);"></span>Markt</span>
+    <span><span class="dot" style="background:var(--gold);"></span>Sonstiges</span>
+  </div>
+
+  <div id="mapview"><div id="map"></div></div>
+
+  <div id="listview">
+    <div class="list-controls">
+      <button class="sortbtn" id="sortDeadline">Nach Deadline sortieren</button>
+    </div>
+    <div class="rows" id="rows"></div>
+  </div>
+
+  <div class="addbar">
+    <button class="addbtn" id="openForm">+ Neuer Eintrag</button>
+  </div>
+
+  <div class="formcard" id="formcard">
+    <div class="formgrid">
+      <div class="full"><label>Name</label><input id="f-name" placeholder="z.B. Marché du Lez"></div>
+      <div><label>Kategorie</label>
+        <select id="f-cat"><option value="festival">Festival</option><option value="markt">Markt</option><option value="sonstiges">Sonstiges</option></select>
+      </div>
+      <div><label>Ort</label><input id="f-city" placeholder="Stadt, Land"></div>
+      <div><label>Breitengrad (lat)</label><input id="f-lat" placeholder="z.B. 47.3769"></div>
+      <div><label>Längengrad (lng)</label><input id="f-lng" placeholder="z.B. 8.5417"></div>
+      <div><label>Daten</label><input id="f-dates" placeholder="z.B. 20.-22. November 2026"></div>
+      <div><label>Deadline (falls bekannt)</label><input id="f-deadline" type="date"></div>
+      <div class="full"><label>Deadline Notiz (falls kein festes Datum)</label><input id="f-deadlinetext" placeholder="z.B. offen, läuft laufend"></div>
+      <div class="full"><label>Link</label><input id="f-link" placeholder="https://..."></div>
+      <div class="full"><label>Kontakt</label><input id="f-contact" placeholder="email / person"></div>
+      <div class="full"><label>Notiz</label><input id="f-note" placeholder="kurze Einordnung"></div>
+    </div>
+    <div class="hint">Koordinaten findest du z.B. per Rechtsklick auf einen Ort in Google Maps.</div>
+    <div class="formactions">
+      <button class="addbtn secondary" id="cancelForm">Abbrechen</button>
+      <button class="addbtn" id="saveForm">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'arno-vertrieb-events';
+  const CAT_COLOR = {festival:'#a97fd6', markt:'#3fa898', sonstiges:'#e8639a'};
+  const CAT_LABEL = {festival:'Festival', markt:'Markt', sonstiges:'Sonstiges'};
+
+  const seed = [
+    {id:'blickfang-zh', name:'Blickfang Design Messe', category:'sonstiges', city:'Zürich, Schweiz', lat:47.3769, lng:8.5417, dates:'20.-22. November 2026', deadline:'2026-10-20', deadlineText:'', link:'https://blickfang.com/wp-content/uploads/BLICKFANG-Ausstellermappe.pdf', contact:'', note:'', archived:false},
+    {id:'blickfang-s', name:'Blickfang Design Messe', category:'sonstiges', city:'Stuttgart, Deutschland', lat:48.7758, lng:9.1829, dates:'12.-14. März 2027', deadline:'2026-10-20', deadlineText:'', link:'https://blickfang.com/wp-content/uploads/BLICKFANG-Ausstellermappe.pdf', contact:'', note:'', archived:false},
+    {id:'blickfang-b', name:'Blickfang Design Messe', category:'sonstiges', city:'Basel, Schweiz', lat:47.5596, lng:7.5886, dates:'19.-21. März 2027', deadline:'2026-10-20', deadlineText:'', link:'https://blickfang.com/wp-content/uploads/BLICKFANG-Ausstellermappe.pdf', contact:'', note:'', archived:false},
+    {id:'blickfang-h', name:'Blickfang Design Messe', category:'sonstiges', city:'Hamburg, Deutschland', lat:53.5511, lng:9.9937, dates:'1.-3. Oktober', deadline:null, deadlineText:'noch offen', link:'https://blickfang.com/wp-content/uploads/BLICKFANG-Ausstellermappe.pdf', contact:'', note:'', archived:false},
+    {id:'formszene', name:'FORMSZENE Design und Kunsthandwerk', category:'markt', city:'Winterthur, Schweiz', lat:47.5001, lng:8.7241, dates:'März 2027', deadline:null, deadlineText:'offen, ab August 2026', link:'https://www.formszene.ch/mitmachen/', contact:'', note:'', archived:false},
+    {id:'naturklang', name:'Naturklang', category:'festival', city:'Zürich, Schweiz', lat:47.3769, lng:8.5417, dates:'Random', deadline:null, deadlineText:'keine, laufende Bewerbung', link:'', contact:'info@naturklang.ch', note:'', archived:false},
+    {id:'laluna', name:'La Luna Yogafestival', category:'festival', city:'Sempachersee, Schweiz', lat:47.1333, lng:8.15, dates:'21.-23. Mai 2027', deadline:null, deadlineText:'offen', link:'https://www.laluna-yogafestival.ch', contact:'Ronald Kalbermatten, infrastruktur@laluna-yogafestival.ch', note:'', archived:false},
+    {id:'burningmountain', name:'Burning Mountain', category:'festival', city:'Zernez, Schweiz', lat:46.6944, lng:10.0989, dates:'24.-27. Juni 2027', deadline:null, deadlineText:'offen', link:'', contact:'', note:'', archived:false},
+    {id:'mystica', name:'Mystica Daydance', category:'festival', city:'Zürich, Schweiz', lat:47.3769, lng:8.5417, dates:'6. März 2027', deadline:null, deadlineText:'offen', link:'', contact:'muestik@gmail.com', note:'', archived:false},
+    {id:'paleo', name:'Paleo Festival', category:'festival', city:'Nyon, Schweiz', lat:46.3833, lng:6.2333, dates:'Ende Juli 2027', deadline:'2027-01-15', deadlineText:'November 2026 – ca. Mitte Januar 2027', link:'https://yeah.paleo.ch/de/node/67', contact:'', note:'', archived:false},
+    {id:'onelove', name:'One Love Festival', category:'festival', city:'Graubünden, Schweiz', lat:46.8, lng:9.6, dates:'letztes August-Wochenende 2027', deadline:'2027-03-01', deadlineText:'Start ca. März/April 2027', link:'https://onelovefestival.ch/contact/', contact:'', note:'', archived:false},
+    {id:'shankra', name:'Shankra', category:'festival', city:'Lostallo, Schweiz', lat:46.3833, lng:9.2667, dates:'ca. Anfang-Mitte Juli 2027', deadline:'2026-11-01', deadlineText:'ca. November 2026', link:'https://shankrafestival.org/de/switzerland/participate/market-application', contact:'', note:'2026 zum 3. Mal in Folge abgesagt, Comeback unsicher', archived:false},
+    {id:'wm-bremgarten', name:'Weihnachtsmarkt Bremgarten', category:'markt', city:'Bremgarten, Schweiz', lat:47.35, lng:8.3333, dates:'3.-6. Dezember 2026', deadline:'2026-08-17', deadlineText:'', link:'https://www.bremgarten.ch/online-schalter/20339/detail', contact:'', note:'Herbstmarkt 10.8.2026, Oster-/Pfingstmarkt 25.1.2027', archived:false},
+    {id:'wm-basel', name:'Weihnachtsmarkt Basel', category:'markt', city:'Basel, Schweiz', lat:47.5596, lng:7.5886, dates:'19. Dezember 2026', deadline:'2026-09-30', deadlineText:'', link:'https://docs.google.com/forms/d/e/1FAIpQLSexL9AOucRsRBnmR50_6IflSZO7_4FTSFa05MOTxEjrjpc3ow/viewform', contact:'', note:'', archived:false},
+    {id:'wm-strasbourg', name:'Weihnachtsmarkt Strasbourg', category:'markt', city:'Strasbourg, Frankreich', lat:48.5734, lng:7.7521, dates:'Dezember 2027', deadline:'2027-04-01', deadlineText:'Start ca. 1. April 2027', link:'https://www.strasbourg.eu/chalet-marche-noel', contact:'', note:'', archived:false},
+    {id:'wm-colmar', name:'Weihnachtsmärkte Colmar, Eguisheim, Münster etc.', category:'markt', city:'Elsass, Frankreich', lat:48.0794, lng:7.3585, dates:'Dezember 2027', deadline:'2027-03-15', deadlineText:'Start ca. März - April 2027', link:'https://www.noel-colmar.com/de/', contact:'', note:'', archived:false},
+    {id:'voov', name:'VooV Festival', category:'festival', city:'Putlitz, Brandenburg, Deutschland', lat:53.2333, lng:12.05, dates:'voraussichtlich 16.-19. Juli 2027', deadline:'2027-01-15', deadlineText:'Start ca. Januar / Februar 2027', link:'https://www.voov-festival.de/contact', contact:'', note:'', archived:false},
+    {id:'feel', name:'Feel Festival', category:'festival', city:'Bergheider See, Brandenburg, Deutschland', lat:51.62, lng:13.8, dates:'voraussichtlich Mitte Juli 2027', deadline:'2026-11-01', deadlineText:'Start ca. November 2026', link:'https://feel-festival.de/kontakt', contact:'', note:'', archived:false},
+    {id:'antaris', name:'Antaris Project Festival', category:'festival', city:'Stölln/Gollenberg, Havelland, Deutschland', lat:52.75, lng:12.35, dates:'Mitte Juli 2027 (evtl. fällt aus)', deadline:null, deadlineText:'offen', link:'', contact:'shops@antaris-project.de', note:'2025 + 2026 pausiert, Comeback 2027 angekündigt', archived:false},
+    {id:'boheme', name:"Bohème Fest' - Marché du Lez", category:'markt', city:'Montpellier, Frankreich', lat:43.6109, lng:3.8772, dates:'Mitte Juni 2027', deadline:null, deadlineText:'laufend offen, je früher desto besser', link:'https://synerg-in.com/projet-evenementiel/boheme-fest-montpellier/', contact:'', note:'', archived:false},
+    {id:'revelations', name:"Révélations - Biennale internationale métiers d'art (B2B)", category:'sonstiges', city:'Paris, Frankreich', lat:48.8661, lng:2.3125, dates:'19.-23. Mai 2027', deadline:'2026-09-27', deadlineText:'2. Bewerbungsphase', link:'https://www.revelations-grandpalais.com/en/exhibit/', contact:'', note:'Sichtbarkeit, Direktverkauf an Sammler, Galerie-Kontakte — eher Konsignation als Wholesale, bizli en stretch aber who knows', archived:false},
+    {id:'wsn', name:'Multiple Exhibitions (B2B context, WSN)', category:'sonstiges', city:'Paris, Frankreich', lat:48.8566, lng:2.3522, dates:'September 2026 – März 2027', deadline:null, deadlineText:'laufend', link:'https://wsn-events.com/en/exposer', contact:'', note:'Registrierung: https://wsn.community/en/pro/first-registration', archived:false},
+    {id:'hadra', name:'Hadra Trance Festival', category:'festival', city:'Vieure, Allier, Frankreich', lat:46.4667, lng:2.8833, dates:'Ende August 2027', deadline:'2027-03-01', deadlineText:'Januar – März 2027', link:'', contact:'stands@hadra.net', note:'', archived:false},
+    {id:'rototom', name:'Rototom Sunsplash Festival', category:'festival', city:'Benicàssim, Valencia, Spanien', lat:40.05, lng:0.0667, dates:'Mitte August 2027', deadline:'2027-02-01', deadlineText:'so früh wie möglich – Februar 2027', link:'https://hello.rototom.com/portal/en/kb/articles/commercial-proposal', contact:'', note:'Mercado ArteSano (Kunsthandwerk) vs. Mercado (allgemein, Bisutería) unterscheiden', archived:false},
+    {id:'palo', name:'Palo Market Fest', category:'markt', city:'Poblenou, Barcelona, Spanien', lat:41.3989, lng:2.1994, dates:'monatlich, jedes erste Wochenende', deadline:null, deadlineText:'laufend, monatlich', link:'https://palomarketfest.com/en/exhibitors', contact:'', note:'', archived:false},
+    {id:'festivalet', name:'Festivalet Markt', category:'markt', city:'Fabra i Coats, Barcelona, Spanien', lat:41.4145, lng:2.1936, dates:'12.-13. Dezember 2026', deadline:'2026-09-01', deadlineText:'startet 1. September', link:'https://www.festivalet.com/contact', contact:'', note:'', archived:false},
+    {id:'bisutex', name:'Bisutex Messe', category:'sonstiges', city:'Madrid, Spanien', lat:40.4168, lng:-3.7038, dates:'24.-27. September', deadline:null, deadlineText:'so schnell wie möglich', link:'https://www.ifema.es/en/bisutex/exhibitors', contact:'', note:'Talents-Wettbewerb (kostenlos) hat eigene Frist, separat prüfen', archived:false},
+    {id:'boom', name:'Boom Festival', category:'festival', city:'Idanha-a-Nova, Portugal', lat:40.0167, lng:-7.2333, dates:'18.-25. Juli 2027', deadline:null, deadlineText:'offen (Website noch nicht aktualisiert)', link:'https://www.boomfestival.org/participate/fleamarket', contact:'', note:'Biennale, 30. Jubiläum', archived:false},
+    {id:'fatacil', name:'FATACIL Lagoa Festival', category:'festival', city:'Lagoa, Algarve, Portugal', lat:37.1333, lng:-8.4667, dates:'Ende August 2027', deadline:'2027-03-01', deadlineText:'März 2027', link:'https://www.fatacil.pt/pages/16', contact:'', note:'', archived:false},
+    {id:'hype', name:'Hype Market', category:'markt', city:'Alvalade, Lissabon, Portugal', lat:38.75, lng:-9.15, dates:'monatlich (Termin TBD)', deadline:null, deadlineText:'noch offen', link:'', contact:'', note:'', archived:false}
+  ];
+
+  let data = [];
+  let activeCats = new Set(['festival','markt','sonstiges']);
+  let sortByDeadline = false;
+  let currentView = 'map';
+  let showArchive = false;
+
+  function todayISO(){ const d=new Date(); return d.toISOString().slice(0,10); }
+  function isSameMonth(dateStr){
+    const d = new Date(dateStr+'T00:00:00'); const now = new Date();
+    return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+  }
+  function status(entry){
+    if(!entry.deadline) return 'rolling';
+    const d = new Date(entry.deadline+'T00:00:00');
+    const now = new Date(todayISO()+'T00:00:00');
+    if(d < now) return 'passed';
+    if(isSameMonth(entry.deadline)) return 'thismonth';
+    return 'upcoming';
+  }
+  function statusLabel(entry){
+    const s = status(entry);
+    if(s==='thismonth') return 'Deadline: '+fmt(entry.deadline)+' · diesen Monat';
+    if(s==='passed') return 'Deadline: '+fmt(entry.deadline)+' · abgelaufen';
+    if(s==='upcoming') return 'Deadline: '+fmt(entry.deadline);
+    return entry.deadlineText ? 'Deadline: '+entry.deadlineText : 'keine feste Deadline';
+  }
+  function fmt(iso){
+    const d = new Date(iso+'T00:00:00');
+    return d.toLocaleDateString('de-CH',{day:'2-digit',month:'short',year:'numeric'});
+  }
+  function markerColor(entry){
+    const s = status(entry);
+    if(s==='thismonth') return '#ff8a1f';
+    if(s==='passed') return '#e6392b';
+    return CAT_COLOR[entry.category];
+  }
+
+  async function loadData(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){ data = JSON.parse(raw); return; }
+    }catch(e){}
+    data = seed;
+    persist();
+  }
+  async function persist(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
+  }
+
+  function visibleEntries(){
+    return data.filter(e => (e.archived===true)===showArchive && activeCats.has(e.category));
+  }
+
+  let map, markerLayer;
+
+  function initMap(){
+    map = L.map('map', {scrollWheelZoom:false}).setView([44,3], 4);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{
+      attribution:'&copy; OpenStreetMap, &copy; CARTO', maxZoom:18
+    }).addTo(map);
+    markerLayer = L.layerGroup().addTo(map);
+  }
+
+  function renderMap(){
+    markerLayer.clearLayers();
+    const entries = visibleEntries();
+    entries.forEach(e=>{
+      const color = markerColor(e);
+      const marker = L.circleMarker([e.lat,e.lng],{
+        radius:8, color:color, weight:2, fillColor:color, fillOpacity:0.6
+      }).addTo(markerLayer);
+      const linkHtml = e.link ? `<div style="margin-top:6px;"><a class="poplink" href="${e.link}" target="_blank" rel="noopener">Link zur Anmeldung</a></div>` : '';
+      const contactHtml = e.contact ? `<div>Kontakt: ${e.contact}</div>` : '';
+      marker.bindPopup(
+        `<p class="popname">${e.name}</p>
+         <div>${e.city}</div>
+         <div>${e.dates}</div>
+         <div>${statusLabel(e)}</div>
+         ${contactHtml}
+         ${linkHtml}`
+      );
+    });
+  }
+
+  function renderList(){
+    const rows = document.getElementById('rows');
+    let entries = visibleEntries();
+    if(sortByDeadline){
+      entries = entries.slice().sort((a,b)=>{
+        if(!a.deadline && !b.deadline) return 0;
+        if(!a.deadline) return 1;
+        if(!b.deadline) return -1;
+        return new Date(a.deadline) - new Date(b.deadline);
+      });
+    }
+    if(entries.length===0){
+      rows.innerHTML = `<div class="empty">${showArchive ? 'Noch nichts archiviert.' : 'Keine Einträge für diese Filter.'}</div>`;
+      return;
+    }
+    rows.innerHTML = entries.map(e=>{
+      const s = status(e);
+      const badgeClass = s;
+      const badgeText = s==='thismonth' ? 'diesen Monat' : s==='passed' ? 'abgelaufen' : s==='rolling' ? (e.deadlineText||'laufend') : fmt(e.deadline);
+      const linkHtml = e.link ? `<a href="${e.link}" target="_blank" rel="noopener" style="color:var(--clay-dark);">Link</a>` : '';
+      return `<div class="row" data-id="${e.id}">
+        <span class="catdot" style="background:${CAT_COLOR[e.category]};"></span>
+        <div>
+          <p class="name">${e.name}</p>
+          <div class="meta">
+            <span>${e.city}</span>
+            <span>${e.dates}</span>
+            <span class="badge ${badgeClass}">${badgeText}</span>
+            ${linkHtml}
+          </div>
+        </div>
+        <div class="rowactions">
+          <button class="iconbtn archive" data-action="archive" title="${showArchive?'Wiederherstellen':'Archivieren'}"><i class="ti ${showArchive?'ti-corner-up-left':'ti-archive'}"></i></button>
+          <button class="iconbtn danger" data-action="delete" title="Löschen"><i class="ti ti-x"></i></button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function renderAll(){
+    if(currentView==='map'){ renderMap(); } else { renderList(); }
+  }
+
+  document.getElementById('tab-map').onclick = ()=>{
+    currentView='map'; showArchive=false;
+    document.getElementById('tab-map').classList.add('active');
+    document.getElementById('tab-list').classList.remove('active');
+    document.getElementById('tab-archiv').classList.remove('active');
+    document.getElementById('mapview').style.display='block';
+    document.getElementById('listview').style.display='none';
+    setTimeout(()=>{ map.invalidateSize(); renderAll(); }, 50);
+  };
+  document.getElementById('tab-list').onclick = ()=>{
+    currentView='list'; showArchive=false;
+    document.getElementById('tab-list').classList.add('active');
+    document.getElementById('tab-map').classList.remove('active');
+    document.getElementById('tab-archiv').classList.remove('active');
+    document.getElementById('mapview').style.display='none';
+    document.getElementById('listview').style.display='block';
+    renderAll();
+  };
+  document.getElementById('tab-archiv').onclick = ()=>{
+    currentView='list'; showArchive=true;
+    document.getElementById('tab-archiv').classList.add('active');
+    document.getElementById('tab-map').classList.remove('active');
+    document.getElementById('tab-list').classList.remove('active');
+    document.getElementById('mapview').style.display='none';
+    document.getElementById('listview').style.display='block';
+    renderAll();
+  };
+
+  document.getElementById('filterbar').addEventListener('click', e=>{
+    const btn = e.target.closest('.chip');
+    if(!btn) return;
+    const cat = btn.dataset.cat;
+    if(activeCats.has(cat)){ activeCats.delete(cat); btn.dataset.on='0'; }
+    else { activeCats.add(cat); btn.dataset.on='1'; }
+    renderAll();
+  });
+
+  document.getElementById('sortDeadline').onclick = function(){
+    sortByDeadline = !sortByDeadline;
+    this.dataset.on = sortByDeadline ? '1':'0';
+    renderList();
+  };
+
+  document.getElementById('rows').addEventListener('click', async e=>{
+    const btn = e.target.closest('.iconbtn');
+    if(!btn) return;
+    const id = btn.closest('.row').dataset.id;
+    const entry = data.find(x=>x.id===id);
+    if(!entry) return;
+    if(btn.dataset.action==='archive'){
+      entry.archived = !entry.archived;
+      await persist();
+      renderAll();
+    } else if(btn.dataset.action==='delete'){
+      if(confirm('Diesen Eintrag endgültig löschen?')){
+        data = data.filter(x=>x.id!==id);
+        await persist();
+        renderAll();
+      }
+    }
+  });
+
+  document.getElementById('openForm').onclick = ()=>{
+    document.getElementById('formcard').classList.add('open');
+  };
+  document.getElementById('cancelForm').onclick = ()=>{
+    document.getElementById('formcard').classList.remove('open');
+  };
+  document.getElementById('saveForm').onclick = async ()=>{
+    const name = document.getElementById('f-name').value.trim();
+    const lat = parseFloat(document.getElementById('f-lat').value);
+    const lng = parseFloat(document.getElementById('f-lng').value);
+    if(!name || isNaN(lat) || isNaN(lng)){
+      alert('Name, Breitengrad und Längengrad sind Pflichtfelder.');
+      return;
+    }
+    const entry = {
+      id: 'custom-'+Date.now(),
+      name,
+      category: document.getElementById('f-cat').value,
+      city: document.getElementById('f-city').value.trim(),
+      lat, lng,
+      dates: document.getElementById('f-dates').value.trim(),
+      deadline: document.getElementById('f-deadline').value || null,
+      deadlineText: document.getElementById('f-deadlinetext').value.trim(),
+      link: document.getElementById('f-link').value.trim(),
+      contact: document.getElementById('f-contact').value.trim(),
+      note: document.getElementById('f-note').value.trim(),
+      archived: false
+    };
+    data.push(entry);
+    await persist();
+    ['f-name','f-city','f-lat','f-lng','f-dates','f-deadline','f-deadlinetext','f-link','f-contact','f-note'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('formcard').classList.remove('open');
+    renderAll();
+  };
+
+  (async function init(){
+    await loadData();
+    initMap();
+    renderAll();
+  })();
+})();
+</script>
