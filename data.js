@@ -12,7 +12,7 @@ window.SO = window.SO || {};
 
   SO.CATEGORIES = ["festival", "markt", "messe", "sonstiges"];
   SO.CAT_LABEL = { festival: "Festival", markt: "Markt", messe: "Messe", sonstiges: "Sonstiges" };
-  SO.CAT_COLOR = { festival: "#8b5cc7", markt: "#2f9d8b", messe: "#c08a2e", sonstiges: "#d8558c" };
+  SO.CAT_COLOR = { festival: "#7c5aa0", markt: "#37897a", messe: "#b07f36", sonstiges: "#c25c82" };
 
   SO.STATUSES = ["offen", "beworben", "wartet", "zugesagt", "abgesagt"];
   SO.STATUS_LABEL = {

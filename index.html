@@ -35,13 +35,19 @@
         <div id="auth-step-email">
           <label for="auth-email">E-Mail</label>
           <input id="auth-email" type="email" inputmode="email" autocomplete="email" placeholder="du@studioarno.ch" required />
-          <button type="submit" id="auth-send" class="btn btn-primary btn-block">Code senden</button>
-          <p class="auth-hint">Du bekommst einen 6-stelligen Code (oder einen Magic-Link) per E-Mail. Nur freigeschaltete Adressen haben Zugriff.</p>
+          <button type="submit" id="auth-send" class="btn btn-primary btn-block">Anmelde-Link senden</button>
+          <p class="auth-hint">Du bekommst einen Anmelde-Link per E-Mail. Öffne ihn auf diesem Gerät — du wirst automatisch angemeldet. Nur freigeschaltete Adressen haben Zugriff.</p>
         </div>
         <div id="auth-step-code" hidden>
-          <label for="auth-code">Code aus der E-Mail</label>
-          <input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="123456" />
-          <button type="button" id="auth-verify" class="btn btn-primary btn-block">Anmelden</button>
+          <p id="auth-sent-text" class="auth-sent-text">Wir haben dir einen Anmelde-Link geschickt. Öffne die Mail auf diesem Gerät und klicke den Link — du wirst automatisch angemeldet.</p>
+          <div class="auth-alt">
+            <button type="button" id="auth-code-toggle" class="btn btn-ghost btn-sm btn-block">Stattdessen Code eintippen</button>
+            <div id="auth-code-fallback" hidden>
+              <label for="auth-code">Code aus der E-Mail</label>
+              <input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="123456" />
+              <button type="button" id="auth-verify" class="btn btn-primary btn-block">Anmelden</button>
+            </div>
+          </div>
           <button type="button" id="auth-back" class="btn btn-ghost btn-block">Andere E-Mail</button>
         </div>
         <p id="auth-msg" class="auth-msg" role="status" aria-live="polite"></p>
@@ -89,21 +95,7 @@
             <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M10.5 3a7.5 7.5 0 1 0 4.55 13.46l4.24 4.24 1.42-1.42-4.24-4.24A7.5 7.5 0 0 0 10.5 3zm0 2a5.5 5.5 0 1 1 0 11 5.5 5.5 0 0 1 0-11z"/></svg>
             <input id="search" type="search" placeholder="Name oder Ort suchen…" aria-label="Suche" />
           </div>
-          <div class="list-head-controls">
-            <label class="sort-wrap">
-              <span class="sort-label">Sortierung</span>
-              <select id="sort" aria-label="Sortierung">
-                <option value="deadline">Nach Deadline</option>
-                <option value="event">Nach Termin</option>
-                <option value="name">Nach Name</option>
-              </select>
-            </label>
-            <div class="segmented" id="archivToggle" role="tablist" aria-label="Ansicht">
-              <button class="seg-btn is-on" data-archiv="0" role="tab" aria-selected="true">Aktiv</button>
-              <button class="seg-btn" data-archiv="1" role="tab" aria-selected="false">Archiv</button>
-            </div>
-            <button id="btnAddDesktop" class="btn btn-primary btn-sm">+ Eintrag</button>
-          </div>
+          <button id="btnAddDesktop" class="btn btn-primary btn-sm btn-add">+ Eintrag</button>
         </div>
 
         <div class="filters">
@@ -124,11 +116,23 @@
           </div>
         </div>
 
+        <div class="list-subhead">
+          <select id="sort" aria-label="Sortierung">
+            <option value="deadline">Nach Deadline</option>
+            <option value="event">Nach Termin</option>
+            <option value="name">Nach Name</option>
+          </select>
+          <div class="segmented" id="archivToggle" role="tablist" aria-label="Ansicht">
+            <button class="seg-btn is-on" data-archiv="0" role="tab" aria-selected="true">Aktiv</button>
+            <button class="seg-btn" data-archiv="1" role="tab" aria-selected="false">Archiv</button>
+          </div>
+        </div>
+
         <div class="deadline-strip" id="deadlineStrip" hidden>
           <div class="deadline-strip-head">
             <span class="strip-title">Nächste Deadlines</span>
           </div>
-          <div class="deadline-tags" id="deadlineTags"></div>
+          <div class="deadline-list" id="deadlineTags"></div>
         </div>
 
         <div class="rows" id="rows"></div>
@@ -211,111 +215,129 @@
         </div>
       </div>
 
-      <div class="field field-full">
-        <label for="f-name">Name</label>
-        <input id="f-name" type="text" placeholder="z.B. Marché du Lez" required />
-      </div>
-
-      <div class="field">
-        <label for="f-cat">Kategorie</label>
-        <select id="f-cat">
-          <option value="festival">Festival</option>
-          <option value="markt">Markt</option>
-          <option value="messe">Messe</option>
-          <option value="sonstiges">Sonstiges</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="f-status">Status</label>
-        <select id="f-status">
-          <option value="offen">Offen</option>
-          <option value="beworben">Beworben</option>
-          <option value="wartet">Wartet</option>
-          <option value="zugesagt">Zugesagt</option>
-          <option value="abgesagt">Abgesagt</option>
-        </select>
-      </div>
-
-      <fieldset class="field-full location-box">
-        <legend>Position</legend>
-
-        <div class="loc-search">
-          <label for="f-geosearch">Ort suchen</label>
-          <div class="geo-search-row">
-            <input id="f-geosearch" type="text" placeholder="Stadt, Adresse oder Ort…" autocomplete="off" />
-            <button type="button" class="btn btn-soft btn-sm" id="f-geosearchBtn">Suchen</button>
+      <!-- Was -->
+      <section class="form-section">
+        <h3 class="form-legend">Was</h3>
+        <div class="form-grid">
+          <div class="field field-full">
+            <label for="f-name">Name</label>
+            <input id="f-name" type="text" placeholder="z.B. Marché du Lez" required />
           </div>
-          <div class="geo-suggest" id="f-geosuggest" hidden></div>
-        </div>
-
-        <div class="loc-actions">
-          <button type="button" class="btn btn-soft btn-sm" id="f-pickmap">Auf Karte wählen</button>
-        </div>
-
-        <div class="loc-paste">
-          <label for="f-paste">Link oder Koordinaten einfügen</label>
-          <input id="f-paste" type="text" placeholder="Google-/Apple-Maps-Link oder „47.37, 8.54“" autocomplete="off" />
-          <p class="hint" id="f-pastehint">Aus Google Maps, Apple Maps oder als „lat, lng“. Kurzlinks (maps.app.goo.gl) vorher im Browser öffnen und die vollständige URL kopieren.</p>
-        </div>
-
-        <div class="loc-coords">
-          <div class="field">
-            <label for="f-lat">Breitengrad (lat)</label>
-            <input id="f-lat" type="text" inputmode="decimal" placeholder="47.3769" required />
-          </div>
-          <div class="field">
-            <label for="f-lng">Längengrad (lng)</label>
-            <input id="f-lng" type="text" inputmode="decimal" placeholder="8.5417" required />
-          </div>
-          <div class="field">
-            <label for="f-city">Stadt</label>
-            <input id="f-city" type="text" placeholder="Zürich" />
-          </div>
-          <div class="field">
-            <label for="f-country">Land</label>
-            <input id="f-country" type="text" placeholder="Schweiz" />
+          <div class="field field-full">
+            <label for="f-cat">Kategorie</label>
+            <select id="f-cat">
+              <option value="festival">Festival</option>
+              <option value="markt">Markt</option>
+              <option value="messe">Messe</option>
+              <option value="sonstiges">Sonstiges</option>
+            </select>
           </div>
         </div>
-      </fieldset>
+      </section>
 
-      <div class="field field-full">
-        <label for="f-dates">Termin (Text)</label>
-        <input id="f-dates" type="text" placeholder="z.B. 20.–22. November 2026" />
-      </div>
-      <div class="field">
-        <label for="f-event-start">Termin von</label>
-        <input id="f-event-start" type="date" />
-      </div>
-      <div class="field">
-        <label for="f-event-end">Termin bis</label>
-        <input id="f-event-end" type="date" />
-      </div>
+      <!-- Wo -->
+      <section class="form-section">
+        <h3 class="form-legend">Wo</h3>
+        <fieldset class="location-box" aria-label="Position">
+          <div class="loc-search">
+            <label for="f-geosearch">Ort suchen</label>
+            <div class="geo-search-row">
+              <input id="f-geosearch" type="text" placeholder="Stadt, Adresse oder Ort…" autocomplete="off" />
+              <button type="button" class="btn btn-soft btn-sm" id="f-geosearchBtn">Suchen</button>
+            </div>
+            <div class="geo-suggest" id="f-geosuggest" hidden></div>
+          </div>
 
-      <div class="field">
-        <label for="f-deadline">Deadline</label>
-        <input id="f-deadline" type="date" />
-      </div>
-      <div class="field">
-        <label for="f-deadlinetext">Deadline-Notiz</label>
-        <input id="f-deadlinetext" type="text" placeholder="z.B. laufend, ab August" />
-      </div>
+          <div class="loc-actions">
+            <button type="button" class="btn btn-soft btn-sm" id="f-pickmap">Auf Karte wählen</button>
+          </div>
 
-      <div class="field field-full">
-        <label for="f-link">Link zur Anmeldung</label>
-        <input id="f-link" type="url" placeholder="https://…" />
-      </div>
-      <div class="field field-full">
-        <label for="f-contact">Kontakt</label>
-        <input id="f-contact" type="text" placeholder="E-Mail oder Person" />
-      </div>
-      <div class="field field-full">
-        <label for="f-cost">Kosten / Standgebühr</label>
-        <input id="f-cost" type="text" placeholder="z.B. 180 € Standgebühr" />
-      </div>
-      <div class="field field-full">
-        <label for="f-note">Notiz</label>
-        <textarea id="f-note" rows="3" placeholder="Kurze Einordnung…"></textarea>
-      </div>
+          <div class="loc-paste">
+            <label for="f-paste">Link oder Koordinaten einfügen</label>
+            <input id="f-paste" type="text" placeholder="Google-/Apple-Maps-Link oder „47.37, 8.54“" autocomplete="off" />
+            <p class="hint" id="f-pastehint">Aus Google Maps, Apple Maps oder als „lat, lng“. Kurzlinks (maps.app.goo.gl) vorher im Browser öffnen und die vollständige URL kopieren.</p>
+          </div>
+
+          <div class="loc-coords">
+            <div class="field">
+              <label for="f-lat">Breitengrad (lat)</label>
+              <input id="f-lat" type="text" inputmode="decimal" placeholder="47.3769" required />
+            </div>
+            <div class="field">
+              <label for="f-lng">Längengrad (lng)</label>
+              <input id="f-lng" type="text" inputmode="decimal" placeholder="8.5417" required />
+            </div>
+            <div class="field">
+              <label for="f-city">Stadt</label>
+              <input id="f-city" type="text" placeholder="Zürich" />
+            </div>
+            <div class="field">
+              <label for="f-country">Land</label>
+              <input id="f-country" type="text" placeholder="Schweiz" />
+            </div>
+          </div>
+        </fieldset>
+      </section>
+
+      <!-- Wann -->
+      <section class="form-section">
+        <h3 class="form-legend">Wann</h3>
+        <div class="form-grid">
+          <div class="field field-full">
+            <label for="f-dates">Termin (Text)</label>
+            <input id="f-dates" type="text" placeholder="z.B. 20.–22. November 2026" />
+          </div>
+          <div class="field">
+            <label for="f-event-start">Termin von</label>
+            <input id="f-event-start" type="date" />
+          </div>
+          <div class="field">
+            <label for="f-event-end">Termin bis</label>
+            <input id="f-event-end" type="date" />
+          </div>
+          <div class="field">
+            <label for="f-deadline">Deadline</label>
+            <input id="f-deadline" type="date" />
+          </div>
+          <div class="field">
+            <label for="f-deadlinetext">Deadline-Notiz</label>
+            <input id="f-deadlinetext" type="text" placeholder="z.B. laufend, ab August" />
+          </div>
+        </div>
+      </section>
+
+      <!-- Status & Notizen -->
+      <section class="form-section">
+        <h3 class="form-legend">Status &amp; Notizen</h3>
+        <div class="form-grid">
+          <div class="field field-full">
+            <label for="f-status">Status</label>
+            <select id="f-status">
+              <option value="offen">Offen</option>
+              <option value="beworben">Beworben</option>
+              <option value="wartet">Wartet</option>
+              <option value="zugesagt">Zugesagt</option>
+              <option value="abgesagt">Abgesagt</option>
+            </select>
+          </div>
+          <div class="field field-full">
+            <label for="f-link">Link zur Anmeldung</label>
+            <input id="f-link" type="url" placeholder="https://…" />
+          </div>
+          <div class="field">
+            <label for="f-contact">Kontakt</label>
+            <input id="f-contact" type="text" placeholder="E-Mail oder Person" />
+          </div>
+          <div class="field">
+            <label for="f-cost">Kosten / Standgebühr</label>
+            <input id="f-cost" type="text" placeholder="z.B. 180 € Standgebühr" />
+          </div>
+          <div class="field field-full">
+            <label for="f-note">Notiz</label>
+            <textarea id="f-note" rows="3" placeholder="Kurze Einordnung…"></textarea>
+          </div>
+        </div>
+      </section>
 
       <div class="form-actions">
         <button type="button" class="btn btn-ghost" data-close="form">Abbrechen</button>

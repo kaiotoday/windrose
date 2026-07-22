@@ -32,6 +32,7 @@
   function cacheDom() {
     [
       "auth", "auth-form", "auth-step-email", "auth-step-code", "auth-email", "auth-send",
+      "auth-sent-text", "auth-code-toggle", "auth-code-fallback",
       "auth-code", "auth-verify", "auth-back", "auth-msg",
       "connError", "connRetry", "connErrorTitle", "connErrorText",
       "app", "demoBadge", "userEmail", "btnLogout",
@@ -276,12 +277,15 @@
 
     if (!upcoming.length) { el.deadlineStrip.hidden = true; return; }
     el.deadlineStrip.hidden = false;
+    // Kompakte VERTIKALE Liste: je eine volle Zeile „Datum · Name". Punkt zeigt
+    // Dringlichkeit (amber = diesen Monat, sonst Tinte). Name wird nicht gekürzt.
     el.deadlineTags.innerHTML = upcoming.map(function (e) {
       var ds = SO.deadlineState(e);
       var urg = ds === "thismonth" ? "urgent-amber" : "urgent-normal";
-      return '<button class="deadline-tag ' + urg + '" data-id="' + esc(e.id) + '">' +
-        '<span class="dt-date">' + esc(SO.fmtDate(e.deadline)) + "</span>" +
-        '<span class="dt-name">' + esc(e.name) + "</span></button>";
+      return '<button class="deadline-row ' + urg + '" data-id="' + esc(e.id) + '">' +
+        '<span class="dl-dot" aria-hidden="true"></span>' +
+        '<span class="dl-date">' + esc(SO.fmtDate(e.deadline)) + "</span>" +
+        '<span class="dl-name">' + esc(e.name) + "</span></button>";
     }).join("");
   }
 
@@ -341,7 +345,9 @@
     // Ort
     html += '<div class="detail-section"><h3>Ort</h3><div class="kv">';
     if (place) html += kv("Adresse", esc(place));
-    html += kv("Koordinaten", '<span style="font-family:var(--font-mono);font-size:13px">' + esc(Number(e.lat).toFixed(4)) + ", " + esc(Number(e.lng).toFixed(4)) + "</span>");
+    html += kv("Koordinaten",
+      '<span style="font-family:var(--font-mono);font-size:13px">' + esc(Number(e.lat).toFixed(4)) + ", " + esc(Number(e.lng).toFixed(4)) + "</span>" +
+      '<button type="button" class="linkbtn" data-act="editpos">Position ändern</button>');
     html += "</div>";
     html += '<div class="map-links" style="margin-top:10px">' +
       '<a class="btn btn-soft btn-sm" href="' + esc(gmaps) + '" target="_blank" rel="noopener">In Google Maps öffnen</a>' +
@@ -439,8 +445,11 @@
   // ============================================================================
   //  Formular
   // ============================================================================
-  function openForm(entry) {
-    // Beim (Neu-)Öffnen laufende Geo-Anfragen entwerten und eine evtl. sichtbare
+  // Befüllt das Formular (Bearbeitungs-Zustand + Felder), OHNE das Sheet zu
+  // öffnen. openForm ruft danach openSheet auf; der Schnellpfad „Position ändern"
+  // nutzt fillForm allein und geht direkt in den Karten-Pick-Modus.
+  function fillForm(entry) {
+    // Beim (Neu-)Befüllen laufende Geo-Anfragen entwerten und eine evtl. sichtbare
     // Konflikt-Leiste zurücksetzen.
     invalidateGeo();
     hideFormConflict();
@@ -470,6 +479,10 @@
     el["f-pastehint"].textContent = defaultPasteHint; // Hinweistext zurücksetzen
     el["f-geosuggest"].hidden = true;
     el["f-geosuggest"].innerHTML = "";
+  }
+
+  function openForm(entry) {
+    fillForm(entry);
     openSheet("form");
   }
 
@@ -812,6 +825,8 @@
         // Nach Login als nicht freigeschaltet erkannt → zurück zur E-Mail-Eingabe.
         el["auth-step-code"].hidden = true;
         el["auth-step-email"].hidden = false;
+        if (el["auth-code-fallback"]) el["auth-code-fallback"].hidden = true;
+        if (el["auth-code-toggle"]) el["auth-code-toggle"].hidden = false;
         setAuthMsg("Diese E-Mail ist nicht freigeschaltet.", "error");
         store.notAllowed = false;
       }
@@ -838,7 +853,22 @@
     if (el.connError) el.connError.hidden = false;
   }
 
+  // Magic-Link-Landung: Sobald die Session steht, die Auth-Tokens aus der
+  // Adresszeile entfernen (#access_token…/#error…), damit die URL sauber bleibt.
+  // Idempotent — falls supabase-js den Hash schon geräumt hat, passiert nichts.
+  function stripAuthHash() {
+    try {
+      var h = window.location.hash || "";
+      if (!h) return;
+      if (/access_token=|refresh_token=|[#&]type=|error_description=|[#&]expires_in=/.test(h)) {
+        window.history.replaceState(null, document.title,
+          window.location.pathname + window.location.search);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
   function showApp() {
+    stripAuthHash();
     el.app.hidden = false;
     if (!mapInited) {
       SO.map.init({ onSelect: function (id) { openDetail(id); } });
@@ -885,9 +915,9 @@
     // Add-Button (Desktop)
     el.btnAddDesktop.addEventListener("click", function () { openForm(null); });
 
-    // Deadline-Tags
+    // Deadline-Zeilen
     el.deadlineTags.addEventListener("click", function (ev) {
-      var b = ev.target.closest(".deadline-tag"); if (!b) return;
+      var b = ev.target.closest(".deadline-row"); if (!b) return;
       openDetail(b.dataset.id);
     });
 
@@ -951,9 +981,19 @@
     // Auth
     el["auth-form"].addEventListener("submit", onAuthSend);
     el["auth-verify"].addEventListener("click", onAuthVerify);
+    // Sekundär: Code-Eingabe (Fallback) aufklappen.
+    if (el["auth-code-toggle"]) el["auth-code-toggle"].addEventListener("click", function () {
+      if (!el["auth-code-fallback"]) return;
+      el["auth-code-fallback"].hidden = false;
+      el["auth-code-toggle"].hidden = true;
+      el["auth-code"].focus();
+    });
     el["auth-back"].addEventListener("click", function () {
       el["auth-step-code"].hidden = true;
       el["auth-step-email"].hidden = false;
+      if (el["auth-code-fallback"]) el["auth-code-fallback"].hidden = true;
+      if (el["auth-code-toggle"]) el["auth-code-toggle"].hidden = false;
+      el["auth-code"].value = "";
       setAuthMsg("");
     });
     el.btnLogout.addEventListener("click", async function () {
@@ -992,6 +1032,16 @@
       }
     } else if (act === "edit" && e) {
       openForm(e);
+    } else if (act === "editpos" && e) {
+      // Direkt in den Bearbeiten-Modus MIT aktivem Pick-Modus springen:
+      // fillForm setzt Bearbeitungs-Zustand + Koordinaten (ohne das Sheet zu
+      // öffnen — sonst würde ein noch ausstehender openSheet-rAF das Formular
+      // gleich wieder über die Karte legen), das offene Detail-Sheet schließen,
+      // dann direkt in den Karten-Pick-Modus. „Fertig" öffnet das Formular mit
+      // der neuen Position zum Speichern.
+      fillForm(e);
+      closeSheet("detail");
+      startPick();
     } else if (act === "archive" && e) {
       // wasArchived VOR dem await festhalten: im Demo-Modus mutiert setArchived
       // das Objekt in place, sonst wäre die Meldung invertiert.
@@ -1052,13 +1102,19 @@
     var email = el["auth-email"].value.trim().toLowerCase();
     if (!email) return;
     el["auth-send"].disabled = true;
-    setAuthMsg("Code wird gesendet…");
+    setAuthMsg("Anmelde-Link wird gesendet…");
     try {
       await store.sendOtp(email);
       el["auth-step-email"].hidden = true;
       el["auth-step-code"].hidden = false;
-      setAuthMsg("Code an " + email + " gesendet. Prüf dein Postfach.", "ok");
-      el["auth-code"].focus();
+      // Code-Fallback beim (erneuten) Senden wieder einklappen.
+      if (el["auth-code-fallback"]) el["auth-code-fallback"].hidden = true;
+      if (el["auth-code-toggle"]) el["auth-code-toggle"].hidden = false;
+      // textContent (kein innerHTML) — die E-Mail bleibt so unschädlich.
+      el["auth-sent-text"].textContent =
+        "Wir haben dir einen Anmelde-Link an " + email + " geschickt. " +
+        "Öffne die Mail auf DIESEM Gerät und klicke den Link — du wirst automatisch angemeldet.";
+      setAuthMsg("");
     } catch (e) {
       setAuthMsg(e.message || "Senden fehlgeschlagen.", "error");
     } finally { el["auth-send"].disabled = false; }

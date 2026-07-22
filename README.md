@@ -107,35 +107,38 @@ Ohne diesen Schritt läuft die App im Demo-Modus. Für den geteilten Betrieb:
    ```
 
 7. `config.js` committen und pushen (GitHub Desktop). Fertig — beim nächsten
-   Öffnen erscheint ein **Login** (E-Mail eingeben → 6-stelligen Code aus der
-   Mail eintippen). Danach seht ihr beide dieselben, live geteilten Daten.
+   Öffnen erscheint ein **Login** (E-Mail eingeben → **Anmelde-Link** in der Mail
+   auf demselben Gerät anklicken). Danach seht ihr beide dieselben, live geteilten Daten.
 
 > **Sicherheit:** Der `anon`-Key **darf** öffentlich im Repo stehen. Er allein
 > gibt keinen Datenzugriff — die RLS-Regeln lassen nur eure freigeschalteten
 > E-Mails an die Daten. **Niemals** den `service_role`-Key oder Passwörter ins
 > Repo legen.
 
-### E-Mail-Login einrichten (wichtig)
+### E-Mail-Login (Anmelde-Link)
 
-Damit der **6-stellige Code** ankommt (und nicht nur ein Magic-Link), müssen zwei
-Dinge in Supabase stimmen:
+Der Login läuft über einen **Anmelde-Link (Magic Link)**: E-Mail eingeben →
+Supabase schickt eine Mail mit einem Link → diesen Link **auf demselben Gerät**
+öffnen, und die App meldet einen automatisch an (supabase-js liest die Session
+aus der zurückkehrenden URL und räumt die Adresszeile danach auf).
 
-1. **Site URL setzen.** Unter **Authentication → URL Configuration** die
-   **Site URL** auf eure GitHub-Pages-Adresse setzen
-   (z.B. `https://euername.github.io/windrose/`). Sonst zeigen die Magic-Links
-   ins Leere. Die App gibt beim Anmelden zusätzlich die aktuelle Seiten-URL als
-   `emailRedirectTo` mit.
-2. **E-Mail-Vorlagen anpassen.** Unter **Authentication → Email Templates**
-   müssen **ZWEI** Vorlagen den Platzhalter **`{{ .Token }}`** (den 6-stelligen
-   Code) enthalten — sonst bekommen die Nutzer nur einen Link und können nichts
-   eintippen:
-   - **„Confirm signup"** — kommt bei der **ersten** Anmeldung einer Adresse
-   - **„Magic Link"** — kommt bei jeder weiteren Anmeldung
+Der **eingebaute Supabase-Mailer** nutzt ausschließlich die **Standard-Vorlagen**.
+Eigene Vorlagen — etwa mit einem 6-stelligen `{{ .Token }}`-Code — sind **nur mit
+eigenem SMTP-Absender** möglich; das wird hier **bewusst nicht** genutzt. Deshalb
+kommt ein **Link** und **kein Code**.
 
-   Für beide dieselbe fertige, schön gestaltete Vorlage aus
-   [`db/email-template.html`](db/email-template.html) einfügen
-   (kompletten Inhalt der Datei in das Template-Feld kopieren).
-   Betreff jeweils: `Dein Windrose-Code`.
+**Einzige nötige Einstellung:** Unter **Authentication → URL Configuration** die
+**Site URL** auf eure GitHub-Pages-Adresse setzen
+(z.B. `https://euername.github.io/windrose/`). Sonst zeigen die Anmelde-Links ins
+Leere. Die App gibt beim Anmelden zusätzlich die aktuelle Seiten-URL als
+`emailRedirectTo` mit.
+
+> Das **Code-Eingabefeld** in der App bleibt als **Fallback** erhalten (kleiner
+> Link „Stattdessen Code eintippen"). Es greift nur, falls ihr später einen
+> **eigenen SMTP-Absender** mit Code-Vorlage einrichtet — im Standardbetrieb wird
+> es nicht gebraucht. Ein eigener SMTP-Absender (unter
+> **Authentication → Providers → Email**) erhöht zugleich die niedrigen
+> Sende-Limits des geteilten Test-Mailers.
 
 **Neue Konten sperren (empfohlen):** In `config.js` steht `shouldCreateUser: true`,
 damit sich Leandra und Arno **das erste Mal** anmelden (und ihr Konto entsteht)
@@ -144,10 +147,6 @@ können. Sobald sich **beide einmal eingeloggt** haben, den Wert auf
 Adresse mehr ein Konto anlegen. Unabhängig davon lässt die App ohnehin nur in
 `allowed_users` freigeschaltete Adressen an die Daten (nicht freigeschaltete
 werden nach dem Login sofort wieder abgemeldet).
-
-Supabase verschickt die Codes standardmäßig über einen geteilten Test-Mailer mit
-niedrigem Limit. Für den Dauerbetrieb lohnt es sich, unter
-**Authentication → Providers → Email** einen eigenen SMTP-Absender zu hinterlegen.
 
 ---
 
