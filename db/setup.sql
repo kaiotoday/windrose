@@ -45,6 +45,8 @@ create table if not exists public.entries (
   contact       text,
   note          text,
   cost          text,
+  visit_start   date,
+  visit_end     date,
   archived      boolean not null default false,
   is_suggestion boolean not null default false,
   source        text,
@@ -54,7 +56,8 @@ create table if not exists public.entries (
   updated_at    timestamptz not null default now(),
   constraint entries_lat_range    check (lat between -90 and 90),
   constraint entries_lng_range    check (lng between -180 and 180),
-  constraint entries_event_order  check (event_end is null or event_start is null or event_end >= event_start)
+  constraint entries_event_order  check (event_end is null or event_start is null or event_end >= event_start),
+  constraint entries_visit_order  check (visit_end is null or visit_start is null or visit_end >= visit_start)
 );
 
 -- Falls die Tabelle aus einer früheren Version stammt: fehlende Spalten ergänzen.
@@ -71,6 +74,8 @@ alter table public.entries add column if not exists link          text;
 alter table public.entries add column if not exists contact       text;
 alter table public.entries add column if not exists note          text;
 alter table public.entries add column if not exists cost          text;
+alter table public.entries add column if not exists visit_start   date;
+alter table public.entries add column if not exists visit_end     date;
 alter table public.entries add column if not exists archived      boolean not null default false;
 alter table public.entries add column if not exists is_suggestion boolean not null default false;
 alter table public.entries add column if not exists source        text;
@@ -93,6 +98,10 @@ begin
   if not exists (select 1 from pg_constraint where conname = 'entries_event_order') then
     alter table public.entries add constraint entries_event_order
       check (event_end is null or event_start is null or event_end >= event_start);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'entries_visit_order') then
+    alter table public.entries add constraint entries_visit_order
+      check (visit_end is null or visit_start is null or visit_end >= visit_start);
   end if;
 end $$;
 
@@ -121,6 +130,7 @@ create table if not exists public.attachments (
 );
 create index if not exists attachments_entry_id_idx on public.attachments(entry_id);
 create index if not exists entries_view_idx on public.entries(is_suggestion, archived, deadline);
+create index if not exists entries_visit_idx on public.entries(visit_start) where visit_start is not null;
 
 -- ---------------------------------------------------------------------------
 -- updated_at automatisch pflegen
@@ -264,12 +274,14 @@ grant select, delete on public.entries to authenticated;
 revoke insert, update on public.entries from authenticated;
 grant insert (
   name, category, city, country, lat, lng, dates_text, event_start, event_end,
-  deadline, deadline_text, status, link, contact, note, cost, archived,
+  deadline, deadline_text, status, link, contact, note, cost, visit_start,
+  visit_end, archived,
   is_suggestion
 ) on public.entries to authenticated;
 grant update (
   name, category, city, country, lat, lng, dates_text, event_start, event_end,
-  deadline, deadline_text, status, link, contact, note, cost, archived,
+  deadline, deadline_text, status, link, contact, note, cost, visit_start,
+  visit_end, archived,
   is_suggestion
 ) on public.entries to authenticated;
 grant select, insert, update, delete on public.attachments to authenticated;

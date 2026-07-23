@@ -35,12 +35,15 @@
       "auth-sent-text", "auth-code-toggle", "auth-code-fallback",
       "auth-code", "auth-verify", "auth-back", "auth-msg",
       "connError", "connRetry", "connErrorTitle", "connErrorText",
-      "app", "demoBadge", "userEmail", "btnLogout",
-      "search", "sort", "archivToggle", "btnAddDesktop", "btnListMode", "filterMenu", "filterCount",
+      "app", "demoBadge", "userEmail", "btnLogout", "desktopViewSwitch",
+      "search", "sort", "archivToggle", "btnAddDesktop", "filterMenu", "filterCount",
+      "filterControls", "listFilterHost", "calendarFilterHost",
       "filterSummary", "activeFilterCount", "countrySummary", "countryOptions", "catSummary", "statusSummary", "filterClear",
       "suggestionCount", "suggestionTabCount",
       "catFilters", "statusFilters", "deadlineStrip", "deadlineTags", "rows",
       "map", "legend", "pickBanner", "pickDone",
+      "panel-calendar", "calendarTitle", "calendarPrev", "calendarToday", "calendarNext",
+      "calendarPlannedOnly", "calendarRangeSummary", "calendarGrid", "calendarUndated",
       "scrim", "detail", "detailKicker", "detailBody",
       "form", "formTitle", "entryForm",
       "formConflict", "f-conflict-reload", "f-conflict-overwrite",
@@ -54,6 +57,9 @@
     el.catInputs = Array.prototype.slice.call(el.catFilters.querySelectorAll("input[data-cat]"));
     el.statusInputs = Array.prototype.slice.call(el.statusFilters.querySelectorAll("input[data-status]"));
     el.segBtns = Array.prototype.slice.call(el.archivToggle.querySelectorAll(".seg-btn"));
+    el.viewBtns = Array.prototype.slice.call(el.desktopViewSwitch.querySelectorAll("[data-view-target]"));
+    el.filterTabs = Array.prototype.slice.call(el.filterMenu.querySelectorAll("[data-filter-tab]"));
+    el.filterPanels = Array.prototype.slice.call(el.filterMenu.querySelectorAll("[data-filter-panel]"));
   }
 
   // ---------- Zustand ----------
@@ -65,6 +71,8 @@
     statuses: new Set(["offen", "beworben", "wartet", "zugesagt", "abgesagt", "verpasst"]),
     search: "",
     sort: "deadline",
+    calendarDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+    calendarPlannedOnly: false,
     selectedId: null,
     detailId: null,
     editingId: null,
@@ -185,6 +193,11 @@
     state.detailId = null;
     var sel = el.rows.querySelector(".row.is-selected");
     if (sel) sel.classList.remove("is-selected");
+    if (el.calendarGrid) {
+      el.calendarGrid.querySelectorAll(".calendar-event.is-selected").forEach(function (node) {
+        node.classList.remove("is-selected");
+      });
+    }
     if (mapInited) SO.map.select(null);
   }
 
@@ -287,6 +300,7 @@
     renderFilterSummary();
     renderList();
     renderDeadlineStrip();
+    renderCalendar();
     if (mapInited) {
       SO.map.render(mapEntries());
       if (state.selectedId) SO.map.select(state.selectedId);
@@ -334,10 +348,12 @@
   function renderPoolCounts() {
     var count = poolEntries("vorschlag").length;
     el.suggestionCount.textContent = count;
-    el.suggestionTabCount.textContent = count;
-    el.suggestionTabCount.hidden = count === 0;
-    var tab = el.suggestionTabCount.closest(".tab");
-    if (tab) tab.setAttribute("aria-label", "Zu kuratieren, " + count + (count === 1 ? " Vorschlag" : " Vorschläge"));
+    if (el.suggestionTabCount) {
+      el.suggestionTabCount.textContent = count;
+      el.suggestionTabCount.hidden = count === 0;
+      var tab = el.suggestionTabCount.closest(".tab");
+      if (tab) tab.setAttribute("aria-label", "Zu kuratieren, " + count + (count === 1 ? " Vorschlag" : " Vorschläge"));
+    }
   }
 
   function renderFilterSummary() {
@@ -452,6 +468,173 @@
     }).join("");
   }
 
+  // ============================================================================
+  //  Monatskalender
+  // ============================================================================
+  function addDays(date, amount) {
+    var next = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    next.setDate(next.getDate() + amount);
+    return next;
+  }
+
+  function isoLocal(date) {
+    var y = date.getFullYear();
+    var m = String(date.getMonth() + 1).padStart(2, "0");
+    var d = String(date.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + d;
+  }
+
+  function daysBetween(a, b) {
+    var utcA = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+    var utcB = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+    return Math.round((utcB - utcA) / 86400000);
+  }
+
+  function validRange(startIso, endIso) {
+    var start = SO.parseDate(startIso);
+    if (!start) return null;
+    var end = SO.parseDate(endIso) || start;
+    if (end < start) end = start;
+    return { start: start, end: end };
+  }
+
+  function clampDate(date, min, max) {
+    if (date < min) return min;
+    if (date > max) return max;
+    return date;
+  }
+
+  function calendarRecords(entries, gridStart, gridEnd) {
+    var records = [];
+    entries.forEach(function (entry) {
+      var eventRange = validRange(entry.event_start, entry.event_end);
+      var visitRange = validRange(entry.visit_start, entry.visit_end);
+      if (eventRange && eventRange.start <= gridEnd && eventRange.end >= gridStart) {
+        records.push({
+          type: "event", entry: entry,
+          start: clampDate(eventRange.start, gridStart, gridEnd),
+          end: clampDate(eventRange.end, gridStart, gridEnd)
+        });
+      }
+      if (visitRange && visitRange.start <= gridEnd && visitRange.end >= gridStart) {
+        records.push({
+          type: "visit", entry: entry,
+          start: clampDate(visitRange.start, gridStart, gridEnd),
+          end: clampDate(visitRange.end, gridStart, gridEnd)
+        });
+      }
+    });
+    return records;
+  }
+
+  function assignCalendarLanes(segments) {
+    segments.sort(function (a, b) {
+      if (a.type !== b.type) return a.type === "visit" ? -1 : 1;
+      if (a.startCol !== b.startCol) return a.startCol - b.startCol;
+      return b.endCol - a.endCol;
+    });
+    var laneEnds = [];
+    segments.forEach(function (segment) {
+      var lane = 0;
+      while (lane < laneEnds.length && segment.startCol <= laneEnds[lane]) lane++;
+      segment.lane = lane;
+      laneEnds[lane] = segment.endCol;
+    });
+    return laneEnds.length;
+  }
+
+  function calendarEventHtml(segment) {
+    var entry = segment.entry;
+    var cat = SO.normCat(entry);
+    var isVisit = segment.type === "visit";
+    var label = isVisit ? "Besuch · " + (entry.name || "") : (entry.name || "");
+    var place = entry.city ? " · " + entry.city : "";
+    var range = isVisit ? dateRange(entry.visit_start, entry.visit_end) : dateRange(entry.event_start, entry.event_end);
+    return '<button type="button" class="calendar-event calendar-cat-' + cat +
+      (isVisit ? " is-visit" : "") + (entry.visit_start ? " has-visit" : "") +
+      (entry.id === state.selectedId ? " is-selected" : "") +
+      '" data-id="' + esc(entry.id) + '" style="grid-column:' + segment.startCol + " / " +
+      (segment.endCol + 1) + ";grid-row:" + (segment.lane + 2) + '" title="' +
+      esc(label + place + (range ? " · " + range : "")) + '">' +
+      (isVisit ? '<span class="calendar-visit-mark" aria-hidden="true">◆</span>' : "") +
+      '<span class="calendar-event-name">' + esc(label) + "</span>" +
+      (segment.startCol === segment.endCol && entry.city ? '<span class="calendar-event-place">' + esc(entry.city) + "</span>" : "") +
+      "</button>";
+  }
+
+  function renderCalendar() {
+    if (!el.calendarGrid) return;
+    var y = state.calendarDate.getFullYear();
+    var m = state.calendarDate.getMonth();
+    var monthStart = new Date(y, m, 1);
+    var monthEnd = new Date(y, m + 1, 0);
+    var mondayOffset = (monthStart.getDay() + 6) % 7;
+    var gridStart = addDays(monthStart, -mondayOffset);
+    var weekCount = Math.ceil((mondayOffset + monthEnd.getDate()) / 7);
+    var gridEnd = addDays(gridStart, weekCount * 7 - 1);
+    var todayIso = isoLocal(new Date());
+
+    var entries = store.list().filter(function (entry) {
+      if (!entryInPool(entry, "aktiv") || !passesFilter(entry)) return false;
+      return !state.calendarPlannedOnly || !!entry.visit_start;
+    });
+    var records = calendarRecords(entries, gridStart, gridEnd);
+    var plannedIds = Object.create(null);
+    var monthEventIds = Object.create(null);
+    records.forEach(function (record) {
+      if (record.type === "event") monthEventIds[record.entry.id] = true;
+      if (record.type === "visit") plannedIds[record.entry.id] = true;
+    });
+    var plannedCount = Object.keys(plannedIds).length;
+
+    el.calendarTitle.textContent = monthStart.toLocaleDateString("de-CH", { month: "long", year: "numeric" });
+    el.calendarRangeSummary.textContent = Object.keys(monthEventIds).length +
+      (Object.keys(monthEventIds).length === 1 ? " Termin" : " Termine") + " · " +
+      plannedCount + " geplant";
+    el.calendarPlannedOnly.classList.toggle("is-on", state.calendarPlannedOnly);
+    el.calendarPlannedOnly.setAttribute("aria-pressed", state.calendarPlannedOnly ? "true" : "false");
+
+    var weeksHtml = "";
+    for (var week = 0; week < weekCount; week++) {
+      var weekStart = addDays(gridStart, week * 7);
+      var weekEnd = addDays(weekStart, 6);
+      var segments = [];
+      records.forEach(function (record) {
+        if (record.start > weekEnd || record.end < weekStart) return;
+        var segmentStart = record.start < weekStart ? weekStart : record.start;
+        var segmentEnd = record.end > weekEnd ? weekEnd : record.end;
+        segments.push({
+          type: record.type, entry: record.entry,
+          startCol: daysBetween(weekStart, segmentStart) + 1,
+          endCol: daysBetween(weekStart, segmentEnd) + 1
+        });
+      });
+      var lanes = assignCalendarLanes(segments);
+      var daysHtml = "";
+      for (var col = 0; col < 7; col++) {
+        var day = addDays(weekStart, col);
+        var dayIso = isoLocal(day);
+        var other = day.getMonth() !== m ? " is-other-month" : "";
+        var today = dayIso === todayIso ? " is-today" : "";
+        var numberText = day.getDate() === 1 || other ?
+          day.toLocaleDateString("de-CH", { day: "numeric", month: "short" }) : String(day.getDate());
+        daysHtml += '<div class="calendar-day-bg' + other + today + '" style="grid-column:' + (col + 1) +
+          '" aria-hidden="true"></div><time class="calendar-day-number' + other + today +
+          '" datetime="' + dayIso + '" style="grid-column:' + (col + 1) + '">' + esc(numberText) + "</time>";
+      }
+      weeksHtml += '<div class="calendar-week" style="--calendar-lanes:' + Math.max(lanes, 1) + '">' +
+        daysHtml + segments.map(calendarEventHtml).join("") + "</div>";
+    }
+    el.calendarGrid.innerHTML = weeksHtml;
+
+    var undated = entries.filter(function (entry) {
+      return !SO.parseDate(entry.event_start) && !SO.parseDate(entry.visit_start);
+    }).length;
+    el.calendarUndated.textContent = undated ? undated +
+      (undated === 1 ? " Eintrag hat noch keinen exakten Termin." : " Einträge haben noch keinen exakten Termin.") : "";
+    el.calendarUndated.hidden = undated === 0;
+  }
+
   function iconPin() {
     return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>';
   }
@@ -505,6 +688,21 @@
     if (e.deadline_text) html += kv("Frist-Notiz", esc(e.deadline_text));
     if (!termin && !e.deadline && !e.deadline_text) html += '<div class="kv-row"><span class="v">Keine Termine hinterlegt.</span></div>';
     html += "</div></div>";
+
+    // Gemeinsamer Reiseplan: Veranstaltungszeitraum und tatsächliche
+    // Anwesenheit bleiben getrennt. Bei einem neuen Plan sind die bekannten
+    // Eventdaten bereits eingesetzt und können vor dem Speichern angepasst werden.
+    var visitStart = e.visit_start || e.event_start || "";
+    var visitEnd = e.visit_end || e.visit_start || e.event_end || e.event_start || "";
+    html += '<div class="detail-section visit-planner' + (e.visit_start ? " is-planned" : "") + '">' +
+      '<div class="detail-section-head"><h3>Besuch planen</h3>' +
+      (e.visit_start ? '<span>Im Kalender markiert</span>' : '<span>Noch nicht geplant</span>') + "</div>" +
+      '<p class="visit-planner-hint">Wann seid ihr tatsächlich vor Ort?</p>' +
+      '<div class="visit-date-grid"><label>Von<input id="visitStart" type="date" value="' + esc(visitStart) + '"></label>' +
+      '<label>Bis<input id="visitEnd" type="date" value="' + esc(visitEnd) + '"></label></div>' +
+      '<div class="visit-actions"><button type="button" class="btn btn-primary btn-sm" data-act="save-visit">Besuch speichern</button>' +
+      (e.visit_start ? '<button type="button" class="btn btn-ghost btn-sm" data-act="clear-visit">Plan entfernen</button>' : "") +
+      "</div></div>";
 
     // Ort
     html += '<div class="detail-section"><h3>Ort</h3><div class="kv">';
@@ -951,6 +1149,14 @@
     if (prev) prev.classList.remove("is-selected");
     var row = el.rows.querySelector('.row[data-id="' + cssEscape(id) + '"]');
     if (row) row.classList.add("is-selected");
+    if (el.calendarGrid) {
+      el.calendarGrid.querySelectorAll(".calendar-event.is-selected").forEach(function (node) {
+        node.classList.remove("is-selected");
+      });
+      el.calendarGrid.querySelectorAll('.calendar-event[data-id="' + cssEscape(id) + '"]').forEach(function (node) {
+        node.classList.add("is-selected");
+      });
+    }
     if (mapInited) {
       SO.map.select(id);
       // Auf Mobile ist die Karte in der Listenansicht display:none. Leaflet kann
@@ -965,19 +1171,32 @@
   //  Ansicht (Mobile-Tabs / Desktop)
   // ============================================================================
   function setView(view) {
+    if (["map", "list", "calendar"].indexOf(view) === -1) return;
+    if (view === "calendar" && state.pool !== "aktiv") {
+      state.pool = "aktiv";
+      el.segBtns.forEach(function (b) {
+        var on = b.dataset.pool === "aktiv";
+        b.classList.toggle("is-on", on);
+        b.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      render();
+    }
     state.view = view;
     el.app.dataset.view = view;
     el.tabs.forEach(function (t) {
       var tv = t.dataset.tab;
-      var on = (tv === "map" && view === "map") ||
-        (tv === "list" && view === "list" && state.pool === "aktiv") ||
-        (tv === "vorschlag" && view === "list" && state.pool === "vorschlag") ||
-        (tv === "archiv" && view === "list" && state.pool === "archiv");
+      var on = tv === view;
       t.setAttribute("aria-current", on ? "true" : "false");
     });
-    var listMode = view === "list";
-    el.btnListMode.setAttribute("aria-pressed", listMode ? "true" : "false");
-    el.btnListMode.querySelector("span").textContent = listMode ? "Karte zeigen" : "Liste gross";
+    el.viewBtns.forEach(function (button) {
+      var on = button.dataset.viewTarget === view;
+      button.classList.toggle("is-on", on);
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    el.filterMenu.open = false;
+    var filterHost = view === "calendar" ? el.calendarFilterHost : el.listFilterHost;
+    if (el.filterControls.parentElement !== filterHost) filterHost.appendChild(el.filterControls);
+    if (view === "calendar") renderCalendar();
     if (view === "map" && mapInited) SO.map.invalidate();
   }
 
@@ -1107,6 +1326,21 @@
       state.statuses = new Set(FILTER_STATUSES);
       render();
     });
+    el.filterMenu.addEventListener("click", function (ev) {
+      var tab = ev.target.closest("[data-filter-tab]");
+      if (!tab) return;
+      var target = tab.dataset.filterTab;
+      el.filterTabs.forEach(function (button) {
+        var on = button.dataset.filterTab === target;
+        button.classList.toggle("is-on", on);
+        button.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      el.filterPanels.forEach(function (panel) {
+        var on = panel.dataset.filterPanel === target;
+        panel.classList.toggle("is-on", on);
+        panel.hidden = !on;
+      });
+    });
     document.addEventListener("click", function (ev) {
       if (el.filterMenu.open && !el.filterMenu.contains(ev.target)) el.filterMenu.open = false;
     });
@@ -1134,8 +1368,33 @@
     });
     // Add-Button (Desktop)
     el.btnAddDesktop.addEventListener("click", function () { openForm(null); });
-    el.btnListMode.addEventListener("click", function () {
-      setView(state.view === "list" ? "map" : "list");
+    el.desktopViewSwitch.addEventListener("click", function (ev) {
+      var button = ev.target.closest("[data-view-target]");
+      if (!button) return;
+      setView(button.dataset.viewTarget);
+    });
+
+    // Kalender-Navigation und -Auswahl
+    el.calendarPrev.addEventListener("click", function () {
+      state.calendarDate = new Date(state.calendarDate.getFullYear(), state.calendarDate.getMonth() - 1, 1);
+      renderCalendar();
+    });
+    el.calendarNext.addEventListener("click", function () {
+      state.calendarDate = new Date(state.calendarDate.getFullYear(), state.calendarDate.getMonth() + 1, 1);
+      renderCalendar();
+    });
+    el.calendarToday.addEventListener("click", function () {
+      var now = new Date();
+      state.calendarDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      renderCalendar();
+    });
+    el.calendarPlannedOnly.addEventListener("click", function () {
+      state.calendarPlannedOnly = !state.calendarPlannedOnly;
+      renderCalendar();
+    });
+    el.calendarGrid.addEventListener("click", function (ev) {
+      var eventButton = ev.target.closest(".calendar-event[data-id]");
+      if (eventButton) openDetail(eventButton.dataset.id);
     });
 
     // Deadline-Zeilen
@@ -1163,8 +1422,7 @@
         if (tab === "add") { openForm(null); return; }
         if (tab === "map") { setView("map"); }
         else if (tab === "list") { setPool("aktiv"); setView("list"); }
-        else if (tab === "vorschlag") { setPool("vorschlag"); setView("list"); }
-        else if (tab === "archiv") { setPool("archiv"); setView("list"); }
+        else if (tab === "calendar") { setView("calendar"); }
       });
     });
 
@@ -1268,6 +1526,54 @@
         } else {
           SO.toast(err.message, "error");
           Array.prototype.forEach.call(switchBtns, function (x) { x.disabled = false; });
+        }
+      }
+    } else if (act === "save-visit" && e) {
+      var visitStartField = $("visitStart");
+      var visitEndField = $("visitEnd");
+      var visitStart = visitStartField ? visitStartField.value : "";
+      var visitEnd = visitEndField ? visitEndField.value : "";
+      if (!SO.parseDate(visitStart)) {
+        SO.toast("Bitte den ersten Besuchstag wählen.", "error");
+        if (visitStartField) visitStartField.focus();
+        return;
+      }
+      if (!visitEnd) visitEnd = visitStart;
+      if (!SO.parseDate(visitEnd) || visitEnd < visitStart) {
+        SO.toast("Der letzte Besuchstag darf nicht vor dem ersten liegen.", "error");
+        if (visitEndField) visitEndField.focus();
+        return;
+      }
+      b.disabled = true;
+      try {
+        await store.update(id, { visit_start: visitStart, visit_end: visitEnd }, e.updated_at || null);
+        SO.toast("Besuch im Kalender markiert.", "ok");
+        refreshDetailIfOpen();
+      } catch (visitErr) {
+        if (visitErr && visitErr.conflict) {
+          SO.toast("Von der anderen Person geändert — Besuch nicht gespeichert", "error");
+          try { await store.refetch(); } catch (_) {}
+          refreshDetailIfOpen();
+        } else {
+          SO.toast(visitErr.message || "Besuch konnte nicht gespeichert werden.", "error");
+          b.disabled = false;
+        }
+      }
+    } else if (act === "clear-visit" && e) {
+      if (b.disabled) return;
+      b.disabled = true;
+      try {
+        await store.update(id, { visit_start: null, visit_end: null }, e.updated_at || null);
+        SO.toast("Besuchsplan entfernt.", "ok");
+        refreshDetailIfOpen();
+      } catch (clearErr) {
+        if (clearErr && clearErr.conflict) {
+          SO.toast("Von der anderen Person geändert — aktualisiert", "error");
+          try { await store.refetch(); } catch (_) {}
+          refreshDetailIfOpen();
+        } else {
+          SO.toast(clearErr.message || "Besuchsplan konnte nicht entfernt werden.", "error");
+          b.disabled = false;
         }
       }
     } else if (act === "save-note" && e) {

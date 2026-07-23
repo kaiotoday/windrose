@@ -82,6 +82,20 @@
           <span class="brand-sub">Studio Arno · Märkte, Festivals &amp; Messen</span>
         </span>
       </div>
+      <nav class="desktop-view-switch" id="desktopViewSwitch" aria-label="Hauptansicht">
+        <button type="button" class="view-switch-btn is-on" data-view-target="map" aria-pressed="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 9 6 4 4.2v14.5L9 20.5l6-2 5 1.8V5.8L15 4zm-6 3.5 6-2v11l-6 2v-11z"/></svg>
+          Karte
+        </button>
+        <button type="button" class="view-switch-btn" data-view-target="list" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h16v2H4v-2z"/></svg>
+          Liste
+        </button>
+        <button type="button" class="view-switch-btn" data-view-target="calendar" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm-2 7h14v10H5V9z"/></svg>
+          Kalender
+        </button>
+      </nav>
       <div class="account">
         <span id="demoBadge" class="demo-badge" hidden>Demo-Modus · nicht geteilt</span>
         <span id="userEmail" class="user-email" hidden></span>
@@ -98,57 +112,54 @@
             <input id="search" type="search" placeholder="Name oder Ort suchen…" aria-label="Suche" />
           </div>
           <button id="btnAddDesktop" class="btn btn-primary btn-sm btn-add">+ Eintrag</button>
-          <button id="btnListMode" class="btn btn-soft btn-sm btn-view-desktop" type="button" aria-pressed="false">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v3H4V5zm0 5h16v3H4v-3zm0 5h16v4H4v-4z"/></svg>
-            <span>Liste gross</span>
-          </button>
         </div>
 
-        <div class="filter-bar">
-          <details class="filter-menu" id="filterMenu">
-            <summary aria-label="Filter öffnen">
-              <span class="filter-menu-title">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v2H4V5zm3 6h10v2H7v-2zm3 6h4v2h-4v-2z"/></svg>
-                Filter
-                <span class="active-filter-count" id="activeFilterCount" hidden>0</span>
-              </span>
-              <span class="filter-summary" id="filterSummary">Alle Einträge</span>
-            </summary>
-            <div class="filter-popover">
-              <div class="filter-popover-head">
-                <strong>Ergebnisse filtern</strong>
-                <button type="button" id="filterClear">Alles zurücksetzen</button>
+        <div class="filter-host" id="listFilterHost">
+          <div class="filter-controls" id="filterControls">
+            <details class="filter-menu" id="filterMenu">
+              <summary aria-label="Filter öffnen">
+                <span class="filter-menu-title">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v2H4V5zm3 6h10v2H7v-2zm3 6h4v2h-4v-2z"/></svg>
+                  Filter
+                  <span class="active-filter-count" id="activeFilterCount" hidden>0</span>
+                </span>
+                <span class="filter-summary" id="filterSummary">Alle Einträge</span>
+              </summary>
+              <div class="filter-popover">
+                <div class="filter-popover-head">
+                  <strong>Ergebnisse filtern</strong>
+                  <button type="button" id="filterClear">Alles zurücksetzen</button>
+                </div>
+                <div class="filter-tabs" role="tablist" aria-label="Filtergruppen">
+                  <button type="button" class="filter-tab is-on" data-filter-tab="country" role="tab" aria-selected="true">Land <span id="countrySummary">Alle</span></button>
+                  <button type="button" class="filter-tab" data-filter-tab="category" role="tab" aria-selected="false">Art <span id="catSummary">Alle</span></button>
+                  <button type="button" class="filter-tab" data-filter-tab="status" role="tab" aria-selected="false">Status <span id="statusSummary">Alle</span></button>
+                </div>
+                <div class="filter-panel is-on" data-filter-panel="country" role="tabpanel">
+                  <div class="facet-options country-options" id="countryOptions" aria-label="Länder"></div>
+                </div>
+                <div class="filter-panel" data-filter-panel="category" role="tabpanel" hidden>
+                  <div class="facet-options" id="catFilters" aria-label="Kategorien">
+                    <label class="facet-option cat-festival"><input type="checkbox" data-cat="festival" checked><span class="facet-swatch"></span><span>Festivals</span><span class="facet-count" data-cat-count="festival">0</span></label>
+                    <label class="facet-option cat-markt"><input type="checkbox" data-cat="markt" checked><span class="facet-swatch"></span><span>Märkte</span><span class="facet-count" data-cat-count="markt">0</span></label>
+                    <label class="facet-option cat-messe"><input type="checkbox" data-cat="messe" checked><span class="facet-swatch"></span><span>Messen</span><span class="facet-count" data-cat-count="messe">0</span></label>
+                    <label class="facet-option cat-sonstiges"><input type="checkbox" data-cat="sonstiges" checked><span class="facet-swatch"></span><span>Sonstiges</span><span class="facet-count" data-cat-count="sonstiges">0</span></label>
+                  </div>
+                </div>
+                <div class="filter-panel" data-filter-panel="status" role="tabpanel" hidden>
+                  <div class="facet-options" id="statusFilters" aria-label="Status">
+                    <label class="facet-option"><input type="checkbox" data-status="offen" checked><span>Offen</span><span class="facet-count" data-status-count="offen">0</span></label>
+                    <label class="facet-option"><input type="checkbox" data-status="beworben" checked><span>Beworben</span><span class="facet-count" data-status-count="beworben">0</span></label>
+                    <label class="facet-option"><input type="checkbox" data-status="wartet" checked><span>Wartet</span><span class="facet-count" data-status-count="wartet">0</span></label>
+                    <label class="facet-option"><input type="checkbox" data-status="zugesagt" checked><span>Zugesagt</span><span class="facet-count" data-status-count="zugesagt">0</span></label>
+                    <label class="facet-option"><input type="checkbox" data-status="abgesagt" checked><span>Abgesagt</span><span class="facet-count" data-status-count="abgesagt">0</span></label>
+                    <label class="facet-option"><input type="checkbox" data-status="verpasst" checked><span>Verpasst</span><span class="facet-count" data-status-count="verpasst">0</span></label>
+                  </div>
+                </div>
               </div>
-
-              <details class="filter-facet" open>
-                <summary><span>Land</span><span id="countrySummary">Alle Länder</span></summary>
-                <div class="facet-options country-options" id="countryOptions" aria-label="Länder"></div>
-              </details>
-
-              <details class="filter-facet">
-                <summary><span>Art</span><span id="catSummary">Alle Arten</span></summary>
-                <div class="facet-options" id="catFilters" aria-label="Kategorien">
-                  <label class="facet-option cat-festival"><input type="checkbox" data-cat="festival" checked><span class="facet-swatch"></span><span>Festivals</span><span class="facet-count" data-cat-count="festival">0</span></label>
-                  <label class="facet-option cat-markt"><input type="checkbox" data-cat="markt" checked><span class="facet-swatch"></span><span>Märkte</span><span class="facet-count" data-cat-count="markt">0</span></label>
-                  <label class="facet-option cat-messe"><input type="checkbox" data-cat="messe" checked><span class="facet-swatch"></span><span>Messen</span><span class="facet-count" data-cat-count="messe">0</span></label>
-                  <label class="facet-option cat-sonstiges"><input type="checkbox" data-cat="sonstiges" checked><span class="facet-swatch"></span><span>Sonstiges</span><span class="facet-count" data-cat-count="sonstiges">0</span></label>
-                </div>
-              </details>
-
-              <details class="filter-facet">
-                <summary><span>Status</span><span id="statusSummary">Alle Status</span></summary>
-                <div class="facet-options" id="statusFilters" aria-label="Status">
-                  <label class="facet-option"><input type="checkbox" data-status="offen" checked><span>Offen</span><span class="facet-count" data-status-count="offen">0</span></label>
-                  <label class="facet-option"><input type="checkbox" data-status="beworben" checked><span>Beworben</span><span class="facet-count" data-status-count="beworben">0</span></label>
-                  <label class="facet-option"><input type="checkbox" data-status="wartet" checked><span>Wartet</span><span class="facet-count" data-status-count="wartet">0</span></label>
-                  <label class="facet-option"><input type="checkbox" data-status="zugesagt" checked><span>Zugesagt</span><span class="facet-count" data-status-count="zugesagt">0</span></label>
-                  <label class="facet-option"><input type="checkbox" data-status="abgesagt" checked><span>Abgesagt</span><span class="facet-count" data-status-count="abgesagt">0</span></label>
-                  <label class="facet-option"><input type="checkbox" data-status="verpasst" checked><span>Verpasst</span><span class="facet-count" data-status-count="verpasst">0</span></label>
-                </div>
-              </details>
-            </div>
-          </details>
-          <span class="filter-count" id="filterCount" aria-live="polite"></span>
+            </details>
+            <span class="filter-count" id="filterCount" aria-live="polite"></span>
+          </div>
         </div>
 
         <div class="list-subhead">
@@ -185,6 +196,37 @@
           <button class="btn btn-primary btn-sm" id="pickDone">Fertig</button>
         </div>
       </section>
+
+      <!-- Grossflächiger Monatskalender -->
+      <section class="panel panel-calendar" id="panel-calendar" aria-label="Kalender">
+        <header class="calendar-toolbar">
+          <div class="calendar-heading">
+            <span class="calendar-kicker">Termine &amp; Reiseplan</span>
+            <h1 id="calendarTitle">Juli 2026</h1>
+          </div>
+          <div class="calendar-actions">
+            <div class="calendar-nav" aria-label="Monat wechseln">
+              <button type="button" class="calendar-nav-btn" id="calendarPrev" aria-label="Vorheriger Monat">←</button>
+              <button type="button" class="calendar-today" id="calendarToday">Heute</button>
+              <button type="button" class="calendar-nav-btn" id="calendarNext" aria-label="Nächster Monat">→</button>
+            </div>
+            <button type="button" class="calendar-planned-toggle" id="calendarPlannedOnly" aria-pressed="false">
+              <span class="calendar-plan-dot" aria-hidden="true"></span> Nur geplante
+            </button>
+          </div>
+          <div class="calendar-filter-row">
+            <div class="filter-host" id="calendarFilterHost"></div>
+            <span class="calendar-range-summary" id="calendarRangeSummary"></span>
+          </div>
+        </header>
+        <div class="calendar-scroll">
+          <div class="calendar-weekdays" aria-hidden="true">
+            <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+          </div>
+          <div class="calendar-grid" id="calendarGrid"></div>
+          <p class="calendar-undated" id="calendarUndated"></p>
+        </div>
+      </section>
     </main>
 
     <!-- Mobile-Tableiste -->
@@ -197,20 +239,13 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h16v2H4v-2z"/></svg>
         <span>Liste</span>
       </button>
+      <button class="tab" data-tab="calendar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2H7zm-2 7h14v10H5V9z"/></svg>
+        <span>Kalender</span>
+      </button>
       <button class="tab tab-add" data-tab="add">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/></svg>
         <span>Neu</span>
-      </button>
-      <button class="tab tab-suggestions" data-tab="vorschlag">
-        <span class="tab-icon-wrap">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm1 5h12V6H6v2zm0 5h8v-2H6v2zm0 5h5v-2H6v2z"/></svg>
-          <span class="tab-count" id="suggestionTabCount">0</span>
-        </span>
-        <span>Prüfen</span>
-      </button>
-      <button class="tab" data-tab="archiv">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v3H4V5zm1 5h14v9H5v-9zm4 2v2h6v-2H9z"/></svg>
-        <span>Archiv</span>
       </button>
     </nav>
   </div>

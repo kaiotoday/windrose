@@ -44,6 +44,12 @@ async function run() {
       zoomControl: document.querySelectorAll(".leaflet-control-zoom").length,
       legend: document.querySelectorAll(".legend").length,
       markersWithoutIcon: document.querySelectorAll(".map-marker:not(:has(svg))").length,
+      pageOverflows: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      overflowingRows: [...document.querySelectorAll("#rows .row")].filter((row) =>
+        row.scrollWidth > row.clientWidth + 1 ||
+        [...row.querySelectorAll(".row-badges > *")].some((badge) =>
+          badge.getBoundingClientRect().right > row.getBoundingClientRect().right + 1)
+      ).length,
       markerTypes: [...new Set([...document.querySelectorAll(".map-marker")]
         .map((node) => [...node.classList].find((name) => name.startsWith("marker-"))))]
     }));
@@ -52,6 +58,49 @@ async function run() {
     assert(base.legend === 0, "Die alte Kartenlegende ist noch sichtbar.");
     assert(base.markerTypes.length >= 3 && base.markersWithoutIcon === 0,
       "Vorhandene Kategorien werden nicht durchgehend als Icons gerendert.");
+    assert(!base.pageOverflows && base.overflowingRows === 0,
+      "Die kleine Liste erzeugt horizontalen Überlauf: " + JSON.stringify(base));
+
+    await page.locator('[data-view-target="list"]').click();
+    await page.waitForTimeout(200);
+    const largeList = await page.evaluate(() => ({
+      columns: getComputedStyle(document.querySelector("#rows")).gridTemplateColumns.split(" ").length,
+      pageOverflows: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      overflowingRows: [...document.querySelectorAll("#rows .row")].filter((row) =>
+        row.scrollWidth > row.clientWidth + 1 ||
+        [...row.querySelectorAll(".row-badges > *")].some((badge) =>
+          badge.getBoundingClientRect().right > row.getBoundingClientRect().right + 1)
+      ).length
+    }));
+    assert(largeList.columns >= 2 && !largeList.pageOverflows && largeList.overflowingRows === 0,
+      "Die grosse Liste erzeugt horizontalen Überlauf: " + JSON.stringify(largeList));
+    await page.locator('[data-view-target="map"]').click();
+
+    await page.locator('[data-view-target="calendar"]').click();
+    await page.waitForTimeout(200);
+    const calendarBase = await page.evaluate(() => ({
+      visible: getComputedStyle(document.querySelector("#panel-calendar")).display !== "none",
+      mapHidden: getComputedStyle(document.querySelector("#panel-map")).display === "none",
+      weeks: document.querySelectorAll("#calendarGrid .calendar-week").length,
+      events: document.querySelectorAll("#calendarGrid .calendar-event:not(.is-visit)").length,
+      horizontalPageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+    }));
+    assert(calendarBase.visible && calendarBase.mapHidden && calendarBase.weeks >= 4 && calendarBase.events > 0,
+      "Die Kalenderansicht ist leer oder nicht grossflächig: " + JSON.stringify(calendarBase));
+    assert(!calendarBase.horizontalPageOverflow, "Der Kalender erzeugt Seiten-Überlauf.");
+    await page.locator("#calendarGrid .calendar-event:not(.is-visit)").first().click();
+    await page.locator('[data-act="save-visit"]').click();
+    await page.waitForTimeout(200);
+    const calendarPlan = await page.evaluate(() => ({
+      visitBars: document.querySelectorAll("#calendarGrid .calendar-event.is-visit").length,
+      plannedLabel: document.querySelector("#calendarRangeSummary").textContent
+    }));
+    assert(calendarPlan.visitBars >= 1 && /1 geplant/.test(calendarPlan.plannedLabel),
+      "Gespeicherter Besuch erscheint nicht als eigenes Kalenderband: " + JSON.stringify(calendarPlan));
+    await page.locator('[data-close="detail"]').click();
+    await page.waitForTimeout(350);
+    await page.screenshot({ path: path.join(visualDir, "windrose-calendar.png") });
+    await page.locator('[data-view-target="map"]').click();
 
     await page.evaluate(() => {
       const key = "standort-demo-v1";
@@ -96,7 +145,7 @@ async function run() {
     assert(proposal.deadlineHidden, "Vorschläge erscheinen im aktiven Deadline-Streifen.");
     assert(proposal.marker === 1 && proposal.badge === "Vorschlag", "Vorschlagsdarstellung fehlt.");
 
-    await page.locator("#btnListMode").click();
+    await page.locator('[data-view-target="list"]').click();
     await page.locator("#rows .row").click();
     await page.waitForTimeout(500);
     const listDetail = await page.evaluate(() => ({
@@ -115,6 +164,18 @@ async function run() {
     assert(listDetail.noteEditable && listDetail.sourceLinked >= 1,
       "Direkte Notiz oder sichere Quelle fehlt: " + JSON.stringify(listDetail));
     await page.screenshot({ path: path.join(visualDir, "windrose-list-detail.png") });
+
+    await page.locator("#visitStart").fill("2026-11-28");
+    await page.locator("#visitEnd").fill("2026-11-29");
+    await page.locator('[data-act="save-visit"]').click();
+    await page.waitForTimeout(200);
+    const savedVisit = await page.evaluate(() => {
+      const item = JSON.parse(localStorage.getItem("standort-demo-v1"))
+        .find((entry) => entry.id === "11111111-2222-4333-8444-555555555555");
+      return { start: item.visit_start, end: item.visit_end };
+    });
+    assert(savedVisit.start === "2026-11-28" && savedVisit.end === "2026-11-29",
+      "Besuchsplanung wurde nicht gespeichert: " + JSON.stringify(savedVisit));
 
     await page.locator("#quickNote").fill("Direkte Notiz funktioniert");
     await page.locator('[data-act="save-note"]').click();
@@ -136,11 +197,11 @@ async function run() {
     await page.locator("#filterMenu > summary").click();
     await page.locator("#countryOptions .country-option", { hasText: "Schweiz" }).locator("input").check();
     await page.locator("#countryOptions .country-option", { hasText: "Frankreich" }).locator("input").check();
-    await page.locator(".filter-facet").nth(1).locator("summary").click();
+    await page.locator('[data-filter-tab="category"]').click();
     await page.locator("#catFilters").locator('input[data-cat="festival"]').uncheck();
     await page.locator("#catFilters").locator('input[data-cat="messe"]').uncheck();
     await page.locator("#catFilters").locator('input[data-cat="sonstiges"]').uncheck();
-    await page.locator(".filter-facet").nth(2).locator("summary").click();
+    await page.locator('[data-filter-tab="status"]').click();
     await page.locator("#statusFilters").locator('input[data-status="beworben"]').uncheck();
     await page.locator("#statusFilters").locator('input[data-status="wartet"]').uncheck();
     await page.locator("#statusFilters").locator('input[data-status="zugesagt"]').uncheck();
@@ -171,9 +232,7 @@ async function run() {
 
     await page.locator("#filterClear").click();
     await page.locator("#filterMenu > summary").click();
-    if ((await page.locator("#btnListMode").getAttribute("aria-pressed")) === "true") {
-      await page.locator("#btnListMode").click();
-    }
+    await page.locator('[data-view-target="map"]').click();
     await page.waitForTimeout(350);
     await page.locator("#rows .row").first().click();
     await page.waitForTimeout(750);
@@ -196,6 +255,16 @@ async function run() {
     });
     await mpage.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
     await mpage.waitForSelector("#app:not([hidden])");
+    await mpage.locator('[data-tab="calendar"]').click();
+    await mpage.waitForTimeout(150);
+    const mobileCalendar = await mpage.evaluate(() => ({
+      current: document.querySelector('[data-tab="calendar"]').getAttribute("aria-current"),
+      visible: getComputedStyle(document.querySelector("#panel-calendar")).display !== "none",
+      internallyScrollable: document.querySelector(".calendar-scroll").scrollWidth > document.querySelector(".calendar-scroll").clientWidth,
+      pageOverflows: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+    }));
+    assert(mobileCalendar.current === "true" && mobileCalendar.visible && mobileCalendar.internallyScrollable && !mobileCalendar.pageOverflows,
+      "Mobiler Kalender ist nicht sauber scrollbar: " + JSON.stringify(mobileCalendar));
     await mpage.locator('[data-tab="list"]').click();
     await mpage.locator("#filterMenu > summary").click();
     await mpage.locator("#countryOptions .country-option", { hasText: "Schweiz" }).locator("input").check();
@@ -219,7 +288,7 @@ async function run() {
     // Browser dürfen externe Font-/Tile-Ressourcen blockieren; echte JS-Fehler
     // und App-Console-Fehler bleiben aber ein harter Testfehler.
     assert(errors.length === 0, errors.join("\n"));
-    console.log(JSON.stringify({ ok: true, base, proposal, listDetail, facet, mapDetail, mobileState }, null, 2));
+    console.log(JSON.stringify({ ok: true, base, largeList, calendarBase, calendarPlan, proposal, listDetail, facet, mapDetail, mobileCalendar, mobileState }, null, 2));
   } finally {
     await browser.close();
   }

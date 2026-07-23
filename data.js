@@ -137,7 +137,8 @@ window.SO = window.SO || {};
   var WRITABLE = [
     "name", "category", "city", "country", "lat", "lng", "dates_text",
     "event_start", "event_end", "deadline", "deadline_text", "status",
-    "link", "contact", "note", "cost", "archived", "is_suggestion"
+    "link", "contact", "note", "cost", "visit_start", "visit_end",
+    "archived", "is_suggestion"
   ];
   function cleanPayload(obj) {
     var out = {};
