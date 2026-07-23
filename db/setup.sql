@@ -46,6 +46,8 @@ create table if not exists public.entries (
   note          text,
   cost          text,
   archived      boolean not null default false,
+  is_suggestion boolean not null default false,
+  source        text,
   created_by    text,
   updated_by    text,
   created_at    timestamptz not null default now(),
@@ -54,22 +56,6 @@ create table if not exists public.entries (
   constraint entries_lng_range    check (lng between -180 and 180),
   constraint entries_event_order  check (event_end is null or event_start is null or event_end >= event_start)
 );
-
--- Falls die Tabelle aus einer früheren Version ohne diese CHECKs stammt:
--- Constraints idempotent nachrüsten (nur anlegen, wenn noch nicht vorhanden).
-do $$
-begin
-  if not exists (select 1 from pg_constraint where conname = 'entries_lat_range') then
-    alter table public.entries add constraint entries_lat_range check (lat between -90 and 90);
-  end if;
-  if not exists (select 1 from pg_constraint where conname = 'entries_lng_range') then
-    alter table public.entries add constraint entries_lng_range check (lng between -180 and 180);
-  end if;
-  if not exists (select 1 from pg_constraint where conname = 'entries_event_order') then
-    alter table public.entries add constraint entries_event_order
-      check (event_end is null or event_start is null or event_end >= event_start);
-  end if;
-end $$;
 
 -- Falls die Tabelle aus einer früheren Version stammt: fehlende Spalten ergänzen.
 alter table public.entries add column if not exists category      text not null default 'sonstiges';
@@ -86,10 +72,29 @@ alter table public.entries add column if not exists contact       text;
 alter table public.entries add column if not exists note          text;
 alter table public.entries add column if not exists cost          text;
 alter table public.entries add column if not exists archived      boolean not null default false;
+alter table public.entries add column if not exists is_suggestion boolean not null default false;
+alter table public.entries add column if not exists source        text;
 alter table public.entries add column if not exists created_by    text;
 alter table public.entries add column if not exists updated_by    text;
 alter table public.entries add column if not exists created_at    timestamptz not null default now();
 alter table public.entries add column if not exists updated_at    timestamptz not null default now();
+
+-- Erst NACH dem Ergänzen alter Spalten die zugehörigen Constraints anlegen.
+-- Sonst würde ein Upgrade von einer sehr alten Tabelle ohne event_start/-end
+-- bereits beim Constraint-Block abbrechen.
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'entries_lat_range') then
+    alter table public.entries add constraint entries_lat_range check (lat between -90 and 90);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'entries_lng_range') then
+    alter table public.entries add constraint entries_lng_range check (lng between -180 and 180);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'entries_event_order') then
+    alter table public.entries add constraint entries_event_order
+      check (event_end is null or event_start is null or event_end >= event_start);
+  end if;
+end $$;
 
 -- status/category CHECK-Constraints idempotent nachrüsten. Auf upgradeten DBs
 -- wurden diese Spalten evtl. per "add column" OHNE Check ergänzt — dann könnten
@@ -115,6 +120,7 @@ create table if not exists public.attachments (
   created_at timestamptz not null default now()
 );
 create index if not exists attachments_entry_id_idx on public.attachments(entry_id);
+create index if not exists entries_view_idx on public.entries(is_suggestion, archived, deadline);
 
 -- ---------------------------------------------------------------------------
 -- updated_at automatisch pflegen
@@ -134,6 +140,9 @@ drop trigger if exists entries_set_updated_at on public.entries;
 create trigger entries_set_updated_at
   before update on public.entries
   for each row execute function public.set_updated_at();
+
+-- Triggerfunktionen sind keine öffentlichen RPC-Endpunkte.
+revoke all on function public.set_updated_at() from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- created_by / updated_by serverseitig aus der JWT-E-Mail setzen (nicht
@@ -167,6 +176,8 @@ create trigger entries_set_actor
   before insert or update on public.entries
   for each row execute function public.set_actor();
 
+revoke all on function public.set_actor() from public, anon, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Zugriffsprüfung: ist die eingeloggte E-Mail freigeschaltet?
 -- security definer, damit die Funktion allowed_users lesen darf (RLS umgehen),
@@ -186,6 +197,11 @@ as $$
     where lower(au.email) = lower(coalesce(auth.jwt() ->> 'email', ''))
   );
 $$;
+
+-- is_allowed() ist absichtlich als RPC für eingeloggte Nutzer verfügbar, aber
+-- nicht für anon/PUBLIC. Die Funktion verrät nur den Status der eigenen JWT-Mail.
+revoke all on function public.is_allowed() from public, anon;
+grant execute on function public.is_allowed() to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Row Level Security
@@ -218,7 +234,10 @@ end $$;
 drop policy if exists allowed_users_select on public.allowed_users;
 create policy allowed_users_select on public.allowed_users
   for select to authenticated
-  using (public.is_allowed());
+  using (
+    public.is_allowed()
+    and lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+  );
 
 -- entries: volle CRUD-Rechte für freigeschaltete Nutzer.
 drop policy if exists entries_all on public.entries;
@@ -237,7 +256,22 @@ create policy attachments_all on public.attachments
 -- Rollen-Grants (RLS bleibt die eigentliche Absicherung).
 grant usage on schema public to anon, authenticated;
 grant select on public.allowed_users to authenticated;
-grant select, insert, update, delete on public.entries to authenticated;
+grant select, delete on public.entries to authenticated;
+-- `source` und die Auditfelder werden nur durch Admin-SQL bzw. Trigger gesetzt.
+-- Der Browser darf ausschließlich die fachlichen Felder verändern. Vorherige
+-- breite Tabellen-Grants werden explizit entfernt, damit das auch auf Upgrades
+-- gilt und nicht nur in data.js als Client-Konvention existiert.
+revoke insert, update on public.entries from authenticated;
+grant insert (
+  name, category, city, country, lat, lng, dates_text, event_start, event_end,
+  deadline, deadline_text, status, link, contact, note, cost, archived,
+  is_suggestion
+) on public.entries to authenticated;
+grant update (
+  name, category, city, country, lat, lng, dates_text, event_start, event_end,
+  deadline, deadline_text, status, link, contact, note, cost, archived,
+  is_suggestion
+) on public.entries to authenticated;
 grant select, insert, update, delete on public.attachments to authenticated;
 
 -- anon (öffentlich, ohne Login) UND die PUBLIC-Pseudorolle bekommen KEINERLEI

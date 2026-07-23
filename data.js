@@ -9,6 +9,9 @@ window.SO = window.SO || {};
 
   // ---------- Konstanten ----------
   var DEMO_KEY = "standort-demo-v1";
+  var DEMO_SEED_VERSION_KEY = "standort-demo-seed-version";
+  var DEMO_DELETED_SEED_KEY = "standort-demo-deleted-seeds";
+  var DEMO_SEED_VERSION = "europa-2026-07";
 
   SO.CATEGORIES = ["festival", "markt", "messe", "sonstiges"];
   SO.CAT_LABEL = { festival: "Festival", markt: "Markt", messe: "Messe", sonstiges: "Sonstiges" };
@@ -66,7 +69,16 @@ window.SO = window.SO || {};
   SO.safeUrl = safeUrl;
 
   // ---------- Datumshelfer (zeitzonensicher) ----------
-  function parseDate(iso) { if (!iso) return null; return new Date(iso + "T00:00:00"); }
+  function parseDate(iso) {
+    if (!iso) return null;
+    var value = String(iso);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+    var d = new Date(value + "T00:00:00");
+    var parts = value.split("-").map(Number);
+    if (Number.isNaN(d.getTime()) || d.getFullYear() !== parts[0] ||
+        d.getMonth() !== parts[1] - 1 || d.getDate() !== parts[2]) return null;
+    return d;
+  }
   function todayStart() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
   function fmtDate(iso) {
     var d = parseDate(iso); if (!d) return "";
@@ -85,6 +97,7 @@ window.SO = window.SO || {};
   function deadlineState(entry) {
     if (!entry.deadline) return "none";
     var d = parseDate(entry.deadline);
+    if (!d) return "none";
     var now = todayStart();
     if (d < now) return "passed";
     if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) return "thismonth";
@@ -124,7 +137,7 @@ window.SO = window.SO || {};
   var WRITABLE = [
     "name", "category", "city", "country", "lat", "lng", "dates_text",
     "event_start", "event_end", "deadline", "deadline_text", "status",
-    "link", "contact", "note", "cost", "archived"
+    "link", "contact", "note", "cost", "archived", "is_suggestion"
   ];
   function cleanPayload(obj) {
     var out = {};
@@ -136,6 +149,8 @@ window.SO = window.SO || {};
     // ungültige Werte werden auf den Default gezwungen (offen/sonstiges).
     if ("status" in out) out.status = STATUS_SET[out.status] ? out.status : "offen";
     if ("category" in out) out.category = CAT_SET[out.category] ? out.category : "sonstiges";
+    if ("archived" in out) out.archived = !!out.archived;
+    if ("is_suggestion" in out) out.is_suggestion = !!out.is_suggestion;
     return out;
   }
 
@@ -192,14 +207,48 @@ window.SO = window.SO || {};
     return changed;
   }
 
+  // Neue, redaktionell recherchierte Seed-Einträge einmalig in bereits
+  // bestehende Demo-Datensätze übernehmen. Vorhandene Einträge werden nie
+  // überschrieben; bewusst gelöschte Seeds erscheinen innerhalb derselben
+  // Version nicht erneut.
+  function mergeDemoSeedAdditions(list) {
+    if (!Array.isArray(list)) return false;
+    try {
+      if (localStorage.getItem(DEMO_SEED_VERSION_KEY) === DEMO_SEED_VERSION) return false;
+    } catch (e) { /* Merge trotzdem versuchen */ }
+
+    var known = {}, deleted = {};
+    try {
+      (JSON.parse(localStorage.getItem(DEMO_DELETED_SEED_KEY) || "[]") || []).forEach(function (id) { deleted[id] = true; });
+    } catch (e) { deleted = {}; }
+    list.forEach(function (e) { if (e && e.id) known[e.id] = true; });
+    // Die ersten 30 IDs sind der ursprüngliche Demo-Datensatz. Nur die später
+    // recherchierten Ergänzungen übernehmen, damit früher bewusst gelöschte
+    // Originalbeispiele nicht wieder auftauchen.
+    (window.STANDORT_SEED || []).slice(30).forEach(function (seedEntry) {
+      if (!known[seedEntry.id] && !deleted[seedEntry.id]) list.push(Object.assign({}, seedEntry));
+    });
+    return true;
+  }
+
+  function markDemoSeedVersion() {
+    try { localStorage.setItem(DEMO_SEED_VERSION_KEY, DEMO_SEED_VERSION); } catch (e) {}
+  }
+
   function demoLoad() {
     try {
       var raw = localStorage.getItem(DEMO_KEY);
       if (raw) {
-        entries = JSON.parse(raw);
+        var parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) throw new Error("Ungültiger Demo-Datensatz");
+        entries = parsed;
         // Einmalige gezielte Reparatur der sechs falschen Fristen; nur bei
         // tatsächlicher Änderung zurückschreiben.
-        if (migrateDemoDeadlines(entries)) demoPersist();
+        var repaired = migrateDemoDeadlines(entries);
+        var expanded = mergeDemoSeedAdditions(entries);
+        if (repaired || expanded) {
+          if (demoPersist() && expanded) markDemoSeedVersion();
+        }
         return;
       }
     } catch (e) { /* ignore */ }
@@ -207,11 +256,11 @@ window.SO = window.SO || {};
     entries = (window.STANDORT_SEED || []).map(function (e) {
       return Object.assign({}, e);
     });
-    demoPersist();
+    if (demoPersist()) markDemoSeedVersion();
   }
   function demoPersist() {
-    try { localStorage.setItem(DEMO_KEY, JSON.stringify(entries)); }
-    catch (e) { if (SO.toast) SO.toast("Konnte nicht lokal speichern (Speicher voll?).", "error"); }
+    try { localStorage.setItem(DEMO_KEY, JSON.stringify(entries)); return true; }
+    catch (e) { return false; }
   }
 
   // ============================================================================
@@ -471,12 +520,15 @@ window.SO = window.SO || {};
     if (this.mode === "demo") {
       var now = new Date().toISOString();
       var row = Object.assign({
-        id: uid(), status: "offen", archived: false,
+        id: uid(), status: "offen", archived: false, is_suggestion: false,
         created_by: "demo", updated_by: "demo",
         created_at: now, updated_at: now
       }, payload);
       entries.push(row);
-      demoPersist();
+      if (!demoPersist()) {
+        entries.pop();
+        throw new Error("Konnte nicht lokal speichern (Speicher voll?).");
+      }
       emitChange();
       return row;
     }
@@ -498,8 +550,13 @@ window.SO = window.SO || {};
     if (this.mode === "demo") {
       var e = this.getById(id);
       if (!e) return null;
+      var before = Object.assign({}, e);
       Object.assign(e, payload, { updated_at: new Date().toISOString(), updated_by: "demo" });
-      demoPersist();
+      if (!demoPersist()) {
+        var idx = entries.indexOf(e);
+        if (idx !== -1) entries[idx] = before;
+        throw new Error("Konnte nicht lokal speichern (Speicher voll?).");
+      }
       emitChange();
       return e;
     }
@@ -529,25 +586,55 @@ window.SO = window.SO || {};
     return this.update(id, { archived: !!val }, expected);
   };
 
-  store.remove = async function (id) {
+  store.remove = async function (id, expectedUpdatedAt) {
     if (this.mode === "demo") {
+      var before = entries;
       entries = entries.filter(function (e) { return e.id !== id; });
-      demoPersist();
+      if (!demoPersist()) {
+        entries = before;
+        throw new Error("Konnte nicht lokal speichern (Speicher voll?).");
+      } else {
+        var isSeed = (window.STANDORT_SEED || []).some(function (seedEntry) { return seedEntry.id === id; });
+        if (isSeed) {
+          try {
+            var deleted = JSON.parse(localStorage.getItem(DEMO_DELETED_SEED_KEY) || "[]");
+            if (!Array.isArray(deleted)) deleted = [];
+            if (deleted.indexOf(id) === -1) deleted.push(id);
+            localStorage.setItem(DEMO_DELETED_SEED_KEY, JSON.stringify(deleted));
+          } catch (err) {}
+        }
+      }
       emitChange();
       return;
     }
-    // Erst die zugehörigen Dateien aus dem Storage entfernen (die DB-Zeilen in
-    // attachments verschwinden per FK-Cascade, die Dateien aber nicht).
+    if (!expectedUpdatedAt) {
+      throw new Error("Interner Fehler: Löschen ohne Versionsstempel abgelehnt.");
+    }
+    // Pfade vor dem Löschen merken. Zuerst die DB-Zeile mit Versionsschutz
+    // löschen; die Metadaten verschwinden per FK-Cascade. So bleiben bei einem
+    // DB-Fehler keine Anhang-Datensätze zurück, die auf gelöschte Dateien zeigen.
     var listRes = await this.supabase.from("attachments").select("path").eq("entry_id", id);
     if (listRes.error) throw sbFail(listRes.error, "Anhänge konnten nicht ermittelt werden.");
     var paths = (listRes.data || []).map(function (a) { return a.path; });
-    if (paths.length) {
-      var rm = await this.supabase.storage.from("attachments").remove(paths);
-      if (rm.error) throw sbFail(rm.error, "Anhang-Dateien konnten nicht gelöscht werden.");
-    }
-    var res = await this.supabase.from("entries").delete().eq("id", id);
+    var res = await this.supabase.from("entries").delete()
+      .eq("id", id).eq("updated_at", expectedUpdatedAt).select("id");
     if (res.error) throw sbFail(res.error, "Eintrag konnte nicht gelöscht werden.");
+    if (!res.data || res.data.length === 0) {
+      var conflict = new Error("Von der anderen Person geändert.");
+      conflict.conflict = true;
+      throw conflict;
+    }
+    var cleanupWarning = "";
+    if (paths.length) {
+      try {
+        var rm = await this.supabase.storage.from("attachments").remove(paths);
+        if (rm.error) cleanupWarning = "Anhang-Dateien konnten nicht vollständig bereinigt werden.";
+      } catch (e) {
+        cleanupWarning = "Anhang-Dateien konnten nicht vollständig bereinigt werden.";
+      }
+    }
     await this.refetch();
+    return { cleanupWarning: cleanupWarning };
   };
 
   // ============================================================================
@@ -573,7 +660,8 @@ window.SO = window.SO || {};
   };
   store.signOut = async function () {
     if (this.mode !== "supabase") return;
-    try { await this.supabase.auth.signOut(); } catch (e) {}
+    var res = await this.supabase.auth.signOut();
+    if (res && res.error) throw sbFail(res.error, "Abmelden fehlgeschlagen.");
     entries = [];
     emitChange();
   };

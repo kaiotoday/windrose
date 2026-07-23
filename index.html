@@ -98,35 +98,72 @@
             <input id="search" type="search" placeholder="Name oder Ort suchen…" aria-label="Suche" />
           </div>
           <button id="btnAddDesktop" class="btn btn-primary btn-sm btn-add">+ Eintrag</button>
+          <button id="btnListMode" class="btn btn-soft btn-sm btn-view-desktop" type="button" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v3H4V5zm0 5h16v3H4v-3zm0 5h16v4H4v-4z"/></svg>
+            <span>Liste gross</span>
+          </button>
         </div>
 
-        <div class="filters">
-          <div class="chip-row" id="catFilters" aria-label="Kategorien">
-            <button class="chip cat-festival is-on" data-cat="festival"><span class="chip-dot"></span>Festivals</button>
-            <button class="chip cat-markt is-on" data-cat="markt"><span class="chip-dot"></span>Märkte</button>
-            <button class="chip cat-messe is-on" data-cat="messe"><span class="chip-dot"></span>Messen</button>
-            <button class="chip cat-sonstiges is-on" data-cat="sonstiges"><span class="chip-dot"></span>Sonstiges</button>
-          </div>
-          <div class="chip-row" id="statusFilters" aria-label="Status">
-            <button class="chip status-chip is-on" data-status="all">Alle Status</button>
-            <button class="chip status-chip" data-status="offen">Offen</button>
-            <button class="chip status-chip" data-status="beworben">Beworben</button>
-            <button class="chip status-chip" data-status="wartet">Wartet</button>
-            <button class="chip status-chip" data-status="zugesagt">Zugesagt</button>
-            <button class="chip status-chip" data-status="abgesagt">Abgesagt</button>
-            <button class="chip status-chip" data-status="verpasst">Verpasst</button>
-          </div>
+        <div class="filter-bar">
+          <details class="filter-menu" id="filterMenu">
+            <summary aria-label="Filter öffnen">
+              <span class="filter-menu-title">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v2H4V5zm3 6h10v2H7v-2zm3 6h4v2h-4v-2z"/></svg>
+                Filter
+                <span class="active-filter-count" id="activeFilterCount" hidden>0</span>
+              </span>
+              <span class="filter-summary" id="filterSummary">Alle Einträge</span>
+            </summary>
+            <div class="filter-popover">
+              <div class="filter-popover-head">
+                <strong>Ergebnisse filtern</strong>
+                <button type="button" id="filterClear">Alles zurücksetzen</button>
+              </div>
+
+              <details class="filter-facet" open>
+                <summary><span>Land</span><span id="countrySummary">Alle Länder</span></summary>
+                <div class="facet-options country-options" id="countryOptions" aria-label="Länder"></div>
+              </details>
+
+              <details class="filter-facet">
+                <summary><span>Art</span><span id="catSummary">Alle Arten</span></summary>
+                <div class="facet-options" id="catFilters" aria-label="Kategorien">
+                  <label class="facet-option cat-festival"><input type="checkbox" data-cat="festival" checked><span class="facet-swatch"></span><span>Festivals</span><span class="facet-count" data-cat-count="festival">0</span></label>
+                  <label class="facet-option cat-markt"><input type="checkbox" data-cat="markt" checked><span class="facet-swatch"></span><span>Märkte</span><span class="facet-count" data-cat-count="markt">0</span></label>
+                  <label class="facet-option cat-messe"><input type="checkbox" data-cat="messe" checked><span class="facet-swatch"></span><span>Messen</span><span class="facet-count" data-cat-count="messe">0</span></label>
+                  <label class="facet-option cat-sonstiges"><input type="checkbox" data-cat="sonstiges" checked><span class="facet-swatch"></span><span>Sonstiges</span><span class="facet-count" data-cat-count="sonstiges">0</span></label>
+                </div>
+              </details>
+
+              <details class="filter-facet">
+                <summary><span>Status</span><span id="statusSummary">Alle Status</span></summary>
+                <div class="facet-options" id="statusFilters" aria-label="Status">
+                  <label class="facet-option"><input type="checkbox" data-status="offen" checked><span>Offen</span><span class="facet-count" data-status-count="offen">0</span></label>
+                  <label class="facet-option"><input type="checkbox" data-status="beworben" checked><span>Beworben</span><span class="facet-count" data-status-count="beworben">0</span></label>
+                  <label class="facet-option"><input type="checkbox" data-status="wartet" checked><span>Wartet</span><span class="facet-count" data-status-count="wartet">0</span></label>
+                  <label class="facet-option"><input type="checkbox" data-status="zugesagt" checked><span>Zugesagt</span><span class="facet-count" data-status-count="zugesagt">0</span></label>
+                  <label class="facet-option"><input type="checkbox" data-status="abgesagt" checked><span>Abgesagt</span><span class="facet-count" data-status-count="abgesagt">0</span></label>
+                  <label class="facet-option"><input type="checkbox" data-status="verpasst" checked><span>Verpasst</span><span class="facet-count" data-status-count="verpasst">0</span></label>
+                </div>
+              </details>
+            </div>
+          </details>
+          <span class="filter-count" id="filterCount" aria-live="polite"></span>
         </div>
 
         <div class="list-subhead">
           <select id="sort" aria-label="Sortierung">
             <option value="deadline">Nach Deadline</option>
             <option value="event">Nach Termin</option>
+            <option value="country">Nach Land</option>
             <option value="name">Nach Name</option>
           </select>
           <div class="segmented" id="archivToggle" role="tablist" aria-label="Ansicht">
-            <button class="seg-btn is-on" data-archiv="0" role="tab" aria-selected="true">Aktiv</button>
-            <button class="seg-btn" data-archiv="1" role="tab" aria-selected="false">Archiv</button>
+            <button class="seg-btn is-on" data-pool="aktiv" role="tab" aria-selected="true">Aktiv</button>
+            <button class="seg-btn" data-pool="vorschlag" role="tab" aria-selected="false">
+              Zu kuratieren <span class="seg-count" id="suggestionCount">0</span>
+            </button>
+            <button class="seg-btn" data-pool="archiv" role="tab" aria-selected="false">Archiv</button>
           </div>
         </div>
 
@@ -143,15 +180,6 @@
       <!-- Karte -->
       <section class="panel panel-map" id="panel-map" aria-label="Karte">
         <div id="map"></div>
-        <div class="legend" id="legend">
-          <span class="legend-item"><span class="legend-dot cat-festival"></span>Festival</span>
-          <span class="legend-item"><span class="legend-dot cat-markt"></span>Markt</span>
-          <span class="legend-item"><span class="legend-dot cat-messe"></span>Messe</span>
-          <span class="legend-item"><span class="legend-dot cat-sonstiges"></span>Sonstiges</span>
-          <span class="legend-sep"></span>
-          <span class="legend-item"><span class="legend-ring ring-amber"></span>Frist diesen Monat</span>
-          <span class="legend-item"><span class="legend-ring ring-red"></span>Frist abgelaufen</span>
-        </div>
         <div class="pick-banner" id="pickBanner" hidden>
           <span>Tippe auf die Karte, um die Position zu setzen. Den Punkt kannst du verschieben.</span>
           <button class="btn btn-primary btn-sm" id="pickDone">Fertig</button>
@@ -173,6 +201,13 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/></svg>
         <span>Neu</span>
       </button>
+      <button class="tab tab-suggestions" data-tab="vorschlag">
+        <span class="tab-icon-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm1 5h12V6H6v2zm0 5h8v-2H6v2zm0 5h5v-2H6v2z"/></svg>
+          <span class="tab-count" id="suggestionTabCount">0</span>
+        </span>
+        <span>Prüfen</span>
+      </button>
       <button class="tab" data-tab="archiv">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v3H4V5zm1 5h14v9H5v-9zm4 2v2h6v-2H9z"/></svg>
         <span>Archiv</span>
@@ -184,7 +219,7 @@
   <div id="scrim" class="scrim" hidden></div>
 
   <!-- Detail -->
-  <aside id="detail" class="sheet sheet-detail" aria-label="Detail" hidden>
+  <aside id="detail" class="sheet sheet-detail" role="dialog" aria-modal="false" aria-label="Detail" hidden>
     <div class="sheet-grip" aria-hidden="true"></div>
     <div class="sheet-head">
       <span class="sheet-kicker" id="detailKicker"></span>
@@ -196,7 +231,7 @@
   </aside>
 
   <!-- Formular -->
-  <aside id="form" class="sheet sheet-form" aria-label="Eintrag bearbeiten" hidden>
+  <aside id="form" class="sheet sheet-form" role="dialog" aria-modal="true" aria-label="Eintrag bearbeiten" hidden>
     <div class="sheet-grip" aria-hidden="true"></div>
     <div class="sheet-head">
       <span class="sheet-kicker" id="formTitle">Neuer Eintrag</span>

@@ -36,7 +36,9 @@
       "auth-code", "auth-verify", "auth-back", "auth-msg",
       "connError", "connRetry", "connErrorTitle", "connErrorText",
       "app", "demoBadge", "userEmail", "btnLogout",
-      "search", "sort", "archivToggle", "btnAddDesktop",
+      "search", "sort", "archivToggle", "btnAddDesktop", "btnListMode", "filterMenu", "filterCount",
+      "filterSummary", "activeFilterCount", "countrySummary", "countryOptions", "catSummary", "statusSummary", "filterClear",
+      "suggestionCount", "suggestionTabCount",
       "catFilters", "statusFilters", "deadlineStrip", "deadlineTags", "rows",
       "map", "legend", "pickBanner", "pickDone",
       "scrim", "detail", "detailKicker", "detailBody",
@@ -49,25 +51,28 @@
       "toasts"
     ].forEach(function (id) { el[id] = $(id); });
     el.tabs = Array.prototype.slice.call(document.querySelectorAll(".tab"));
-    el.catChips = Array.prototype.slice.call(el.catFilters.querySelectorAll(".chip"));
-    el.statusChips = Array.prototype.slice.call(el.statusFilters.querySelectorAll(".chip"));
+    el.catInputs = Array.prototype.slice.call(el.catFilters.querySelectorAll("input[data-cat]"));
+    el.statusInputs = Array.prototype.slice.call(el.statusFilters.querySelectorAll("input[data-status]"));
     el.segBtns = Array.prototype.slice.call(el.archivToggle.querySelectorAll(".seg-btn"));
   }
 
   // ---------- Zustand ----------
   var state = {
     view: "map",
-    archiv: false,
+    pool: "aktiv",
     cats: new Set(SO.CATEGORIES),
-    status: "all",
+    countries: new Set(),
+    statuses: new Set(["offen", "beworben", "wartet", "zugesagt", "abgesagt", "verpasst"]),
     search: "",
     sort: "deadline",
     selectedId: null,
     detailId: null,
     editingId: null,
     openSheet: null,
+    returnFocus: null,
     pickActive: false
   };
+  var FILTER_STATUSES = ["offen", "beworben", "wartet", "zugesagt", "abgesagt", "verpasst"];
   var mapInited = false;
   var detailAtts = {}; // id -> attachment (für Löschen)
 
@@ -109,15 +114,33 @@
   function openSheet(name) {
     var node = name === "form" ? el.form : el.detail;
     var other = name === "form" ? el.detail : el.form;
+    if (!state.openSheet) state.returnFocus = document.activeElement;
     if (other.classList.contains("is-open")) {
       other.classList.remove("is-open");
       transitionEndOnce(other, function () { if (!other.classList.contains("is-open")) other.hidden = true; });
     }
     node.hidden = false;
     el.scrim.hidden = false;
+    el.scrim.dataset.sheet = name;
+    var modal = name === "form" || window.innerWidth < 880;
+    el.app.classList.toggle("has-detail", name === "detail");
+    node.setAttribute("aria-modal", modal ? "true" : "false");
+    if (modal) el.app.inert = true;
+    else el.app.inert = false;
+    function focusCloseButton() {
+      if (state.openSheet !== name || node.hidden) return;
+      var closeButton = node.querySelector(".sheet-close");
+      if (!closeButton) return;
+      try { closeButton.focus({ preventScroll: true }); }
+      catch (_) { closeButton.focus(); }
+    }
     requestAnimationFrame(function () {
       el.scrim.classList.add("is-open");
       node.classList.add("is-open");
+      focusCloseButton();
+      // Chromium kann beim nachträglichen Setzen von `inert` den Fokus erst im
+      // nächsten Task auf <body> verschieben. Danach nochmals sicher setzen.
+      setTimeout(focusCloseButton, 60);
     });
     state.openSheet = name;
   }
@@ -127,10 +150,25 @@
     node.classList.remove("is-open");
     el.scrim.classList.remove("is-open");
     if (state.openSheet === name) state.openSheet = null;
+    if (name === "detail") el.app.classList.remove("has-detail");
     transitionEndOnce(node, function () { if (!node.classList.contains("is-open")) node.hidden = true; });
-    transitionEndOnce(el.scrim, function () { if (!el.scrim.classList.contains("is-open")) el.scrim.hidden = true; });
+    transitionEndOnce(el.scrim, function () {
+      if (!el.scrim.classList.contains("is-open")) {
+        el.scrim.hidden = true;
+        delete el.scrim.dataset.sheet;
+      }
+    });
     if (name === "detail") { clearSelection(); }
     if (name === "form") { SO.map.clearPick(); invalidateGeo(); hideFormConflict(); }
+    setTimeout(function () {
+      if (!state.openSheet) {
+        el.app.inert = false;
+        if (state.returnFocus && state.returnFocus.isConnected && typeof state.returnFocus.focus === "function") {
+          state.returnFocus.focus();
+        }
+        state.returnFocus = null;
+      }
+    }, 410);
   }
 
   // Entwertet laufende Geo-Anfragen (Suche + Reverse-Geocoding), damit eine
@@ -153,9 +191,14 @@
   // ============================================================================
   //  Filter + Sortierung
   // ============================================================================
+  function countryKey(value) {
+    return String(value || "").trim().toLocaleLowerCase("de-CH");
+  }
+
   function passesFilter(e) {
     if (!state.cats.has(SO.normCat(e))) return false;
-    if (state.status !== "all" && SO.derivedStatus(e) !== state.status) return false;
+    if (!state.statuses.has(SO.derivedStatus(e))) return false;
+    if (state.countries.size && !state.countries.has(countryKey(e.country))) return false;
     if (state.search) {
       var hay = ((e.name || "") + " " + (e.city || "") + " " + (e.country || "")).toLowerCase();
       if (hay.indexOf(state.search) < 0) return false;
@@ -167,11 +210,18 @@
     var by = state.sort;
     return arr.slice().sort(function (a, b) {
       if (by === "name") return (a.name || "").localeCompare(b.name || "", "de");
+      if (by === "country") {
+        var countryOrder = (a.country || "").localeCompare(b.country || "", "de");
+        if (countryOrder) return countryOrder;
+        var cityOrder = (a.city || "").localeCompare(b.city || "", "de");
+        return cityOrder || (a.name || "").localeCompare(b.name || "", "de");
+      }
       if (by === "event") {
-        if (!a.event_start && !b.event_start) return (a.name || "").localeCompare(b.name || "", "de");
-        if (!a.event_start) return 1;
-        if (!b.event_start) return -1;
-        return SO.parseDate(a.event_start) - SO.parseDate(b.event_start);
+        var da = SO.parseDate(a.event_start), db = SO.parseDate(b.event_start);
+        if (!da && !db) return (a.name || "").localeCompare(b.name || "", "de");
+        if (!da) return 1;
+        if (!db) return -1;
+        return da - db;
       }
       // deadline (Standard): kommende Fristen aufsteigend zuerst,
       // dann Einträge ohne Frist, ganz am Ende die abgelaufenen.
@@ -184,20 +234,29 @@
 
   // 0 = kommende Frist, 1 = keine Frist, 2 = abgelaufen
   function deadlineSortRank(e) {
-    if (!e.deadline) return 1;
+    if (!e.deadline || !SO.parseDate(e.deadline)) return 1;
     return SO.deadlineState(e) === "passed" ? 2 : 0;
   }
 
   function listEntries() {
     return sortEntries(store.list().filter(function (e) {
-      return (!!e.archived) === state.archiv && passesFilter(e);
+      return entryInPool(e) && passesFilter(e);
     }));
   }
+  function entryInPool(e, pool) {
+    var target = pool || state.pool;
+    if (target === "archiv") return !!e.archived;
+    if (target === "vorschlag") return !e.archived && !!e.is_suggestion;
+    return !e.archived && !e.is_suggestion;
+  }
+  function poolEntries(pool) {
+    return store.list().filter(function (e) { return entryInPool(e, pool); });
+  }
   function mapEntries() {
-    // Karte und Liste teilen sich dieselbe Filterquelle: im Archiv-Modus zeigt
-    // die Karte die archivierten Einträge, sonst die aktiven.
+    // Karte und Liste teilen sich dieselbe Filterquelle für Aktiv, Vorschläge
+    // und Archiv.
     return store.list().filter(function (e) {
-      return (!!e.archived) === state.archiv && passesFilter(e);
+      return entryInPool(e) && passesFilter(e);
     });
   }
 
@@ -223,6 +282,9 @@
   //  Rendering
   // ============================================================================
   function render() {
+    renderPoolCounts();
+    renderCountryFilter();
+    renderFilterSummary();
     renderList();
     renderDeadlineStrip();
     if (mapInited) {
@@ -233,13 +295,16 @@
 
   function renderList() {
     var items = listEntries();
+    el.filterCount.textContent = items.length + (items.length === 1 ? " Eintrag" : " Einträge");
     if (!items.length) {
+      var emptyTitle = state.pool === "archiv" ? "Archiv ist leer" :
+        state.pool === "vorschlag" ? "Nichts zu kuratieren" : "Nichts gefunden";
+      var emptyText = state.pool === "archiv" ? "Archivierte Einträge tauchen hier auf." :
+        state.pool === "vorschlag" ? "Neue Recherchevorschläge erscheinen hier nach dem nächsten Datenimport." :
+        "Passe Suche oder Filter an — oder leg einen neuen Eintrag an.";
       el.rows.innerHTML =
-        '<div class="empty"><div class="empty-title">' +
-        (state.archiv ? "Archiv ist leer" : "Nichts gefunden") +
-        '</div><div class="empty-sub">' +
-        (state.archiv ? "Archivierte Einträge tauchen hier auf." : "Passe Suche oder Filter an — oder leg einen neuen Eintrag an.") +
-        "</div></div>";
+        '<div class="empty"><div class="empty-title">' + emptyTitle +
+        '</div><div class="empty-sub">' + emptyText + "</div></div>";
       return;
     }
     el.rows.innerHTML = items.map(function (e) {
@@ -249,6 +314,7 @@
       var termin = e.dates_text || dateRange(e.event_start, e.event_end);
       var cat = SO.normCat(e);
       return '<div class="row row-' + cat + (e.archived ? " is-archived" : "") +
+        (e.is_suggestion ? " is-suggestion" : "") +
         (e.id === state.selectedId ? " is-selected" : "") + '" data-id="' + esc(e.id) + '" tabindex="0" role="button">' +
         '<span class="chip-dot" style="background:' + (SO.CAT_COLOR[cat] || "#999") + '"></span>' +
         '<div class="row-main">' +
@@ -258,19 +324,116 @@
         (termin ? '<span class="m">' + iconCal() + esc(termin) + "</span>" : "") +
         "</div></div>" +
         '<div class="row-badges">' +
+        (e.is_suggestion ? '<span class="suggestion-badge">Vorschlag</span>' : "") +
         statusBadgeHtml(e) +
         '<span class="badge badge-deadline ' + d.cls + '">' + esc(d.text) + "</span>" +
         "</div></div>";
     }).join("");
   }
 
+  function renderPoolCounts() {
+    var count = poolEntries("vorschlag").length;
+    el.suggestionCount.textContent = count;
+    el.suggestionTabCount.textContent = count;
+    el.suggestionTabCount.hidden = count === 0;
+    var tab = el.suggestionTabCount.closest(".tab");
+    if (tab) tab.setAttribute("aria-label", "Zu kuratieren, " + count + (count === 1 ? " Vorschlag" : " Vorschläge"));
+  }
+
+  function renderFilterSummary() {
+    var catCount = state.cats.size;
+    var catText = catCount === SO.CATEGORIES.length ? "Alle Arten" :
+      catCount === 0 ? "Keine Art" : catCount + (catCount === 1 ? " Art" : " Arten");
+    var statusCount = state.statuses.size;
+    var statusText = statusCount === FILTER_STATUSES.length ? "Alle Status" :
+      statusCount === 0 ? "Kein Status" : statusCount + " Status";
+    var countryText = el.countrySummary.textContent || "Alle Länder";
+    var activeGroups = (state.countries.size ? 1 : 0) +
+      (catCount !== SO.CATEGORIES.length ? 1 : 0) +
+      (statusCount !== FILTER_STATUSES.length ? 1 : 0);
+
+    el.catSummary.textContent = catText;
+    el.statusSummary.textContent = statusText;
+    el.filterSummary.textContent = activeGroups ? [countryText, catText, statusText].join(" · ") : "Alle Einträge";
+    el.activeFilterCount.textContent = activeGroups;
+    el.activeFilterCount.hidden = activeGroups === 0;
+    el.filterMenu.classList.toggle("has-active-filters", activeGroups > 0);
+
+    el.catInputs.forEach(function (input) { input.checked = state.cats.has(input.dataset.cat); });
+    el.statusInputs.forEach(function (input) { input.checked = state.statuses.has(input.dataset.status); });
+
+    var catCounts = { festival: 0, markt: 0, messe: 0, sonstiges: 0 };
+    var statusCounts = { offen: 0, beworben: 0, wartet: 0, zugesagt: 0, abgesagt: 0, verpasst: 0 };
+    poolEntries().forEach(function (entry) {
+      catCounts[SO.normCat(entry)]++;
+      statusCounts[SO.derivedStatus(entry)]++;
+    });
+    el.catFilters.querySelectorAll("[data-cat-count]").forEach(function (node) {
+      node.textContent = catCounts[node.dataset.catCount] || 0;
+    });
+    el.statusFilters.querySelectorAll("[data-status-count]").forEach(function (node) {
+      node.textContent = statusCounts[node.dataset.statusCount] || 0;
+    });
+  }
+
+  function renderCountryFilter() {
+    // Null-Prototyp: frei eingegebene Ländernamen wie "__proto__" oder
+    // "constructor" dürfen nicht mit Object-Eigenschaften kollidieren.
+    var countries = Object.create(null);
+    var available = poolEntries();
+    available.forEach(function (e) {
+      var label = String(e.country || "").trim();
+      var key = countryKey(label);
+      if (!key) return;
+      if (!countries[key]) countries[key] = { label: label, count: 0 };
+      countries[key].count++;
+    });
+
+    var keys = Object.keys(countries).sort(function (a, b) {
+      return countries[a].label.localeCompare(countries[b].label, "de");
+    });
+    Array.from(state.countries).forEach(function (key) {
+      if (keys.indexOf(key) === -1) state.countries.delete(key);
+    });
+
+    var fragment = document.createDocumentFragment();
+    keys.forEach(function (key) {
+      var label = document.createElement("label");
+      label.className = "country-option";
+      var input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = key;
+      input.checked = state.countries.has(key);
+      input.dataset.country = key;
+      var name = document.createElement("span");
+      name.textContent = countries[key].label;
+      var count = document.createElement("span");
+      count.className = "country-option-count";
+      count.textContent = countries[key].count;
+      label.appendChild(input);
+      label.appendChild(name);
+      label.appendChild(count);
+      fragment.appendChild(label);
+    });
+    el.countryOptions.replaceChildren(fragment);
+    if (!state.countries.size) {
+      el.countrySummary.textContent = "Alle Länder";
+    } else if (state.countries.size === 1) {
+      var selectedKey = Array.from(state.countries)[0];
+      el.countrySummary.textContent = countries[selectedKey] ? countries[selectedKey].label : "1 Land";
+    } else {
+      el.countrySummary.textContent = state.countries.size + " Länder";
+    }
+  }
+
   function renderDeadlineStrip() {
-    // Im Archiv-Modus ergibt der „Nächste Deadlines"-Streifen keinen Sinn
-    // (er zeigt ausschließlich aktive Einträge) — dann komplett ausblenden.
-    if (state.archiv) { el.deadlineStrip.hidden = true; return; }
+    // Der Streifen ist eine Arbeitsliste für bereits übernommene, aktive
+    // Einträge. Recherchevorschläge und Archiviertes bleiben bewusst draussen.
+    if (state.pool !== "aktiv") { el.deadlineStrip.hidden = true; return; }
     var now = SO.todayStart();
     var upcoming = store.list().filter(function (e) {
-      if (e.archived || !e.deadline) return false;
+      if (e.archived || e.is_suggestion || !e.deadline) return false;
+      if (!passesFilter(e)) return false;
       if (!SO.showUrgency(e)) return false; // zugesagt/abgesagt tauchen hier nie auf
       return SO.parseDate(e.deadline) >= now;
     }).sort(function (a, b) { return SO.parseDate(a.deadline) - SO.parseDate(b.deadline); }).slice(0, 3);
@@ -304,7 +467,7 @@
     if (!e) return;
     state.detailId = id;
     setSelected(id);
-    el.detailKicker.textContent = SO.CAT_LABEL[SO.normCat(e)];
+    el.detailKicker.textContent = (e.is_suggestion ? "Zu kuratieren · " : "") + SO.CAT_LABEL[SO.normCat(e)];
     el.detailBody.innerHTML = detailHtml(e);
     openSheet("detail");
     if (!store.isDemo()) loadAttachments(id);
@@ -321,6 +484,7 @@
     html += '<h2 class="detail-title">' + esc(e.name) + "</h2>";
     html += '<div class="detail-chips">' +
       '<span class="cat-tag cat-' + cat + '">' + esc(SO.CAT_LABEL[cat]) + "</span>" +
+      (e.is_suggestion ? '<span class="suggestion-badge">Vorschlag</span>' : "") +
       statusBadgeHtml(e) +
       '<span class="badge badge-deadline ' + d.cls + '">Frist: ' + esc(d.text) + "</span>" +
       "</div>";
@@ -356,7 +520,7 @@
 
     // Weitere Infos
     var safeLink = safeUrl(e.link);
-    var hasMore = e.link || e.contact || e.cost;
+    var hasMore = e.link || e.contact || e.cost || e.source;
     if (hasMore) {
       html += '<div class="detail-section"><h3>Infos</h3><div class="kv">';
       if (safeLink) {
@@ -367,12 +531,16 @@
       }
       if (e.contact) html += kv("Kontakt", esc(e.contact));
       if (e.cost) html += kv("Kosten", esc(e.cost));
+      if (e.source) html += kv("Quelle", sourceHtml(e.source));
       html += "</div></div>";
     }
 
-    if (e.note) {
-      html += '<div class="detail-section"><h3>Notiz</h3><div class="detail-note">' + esc(e.note) + "</div></div>";
-    }
+    html += '<div class="detail-section detail-note-editor">' +
+      '<div class="detail-section-head"><h3>Notiz</h3><span>direkt bearbeitbar</span></div>' +
+      '<textarea id="quickNote" rows="5" placeholder="Eigene Einschätzung, Rückmeldung oder nächste Schritte …">' +
+      esc(e.note || "") + "</textarea>" +
+      '<div class="note-actions"><button class="btn btn-soft btn-sm" data-act="save-note">Notiz speichern</button></div>' +
+      "</div>";
 
     // Anhänge
     html += '<div class="detail-section"><h3>Anhänge</h3><div id="attachBox">';
@@ -387,8 +555,10 @@
 
     // Aktionen
     html += '<div class="detail-actions">' +
+      (e.is_suggestion && !e.archived ? '<button class="btn btn-primary" data-act="adopt">Übernehmen</button>' : "") +
       '<button class="btn" data-act="edit">Bearbeiten</button>' +
-      '<button class="btn btn-soft" data-act="archive">' + (e.archived ? "Wiederherstellen" : "Archivieren") + "</button>" +
+      '<button class="btn btn-soft" data-act="archive">' +
+        (e.archived ? "Wiederherstellen" : e.is_suggestion ? "Verwerfen" : "Archivieren") + "</button>" +
       '<button class="btn btn-danger" data-act="delete">Löschen</button>' +
       "</div>";
 
@@ -406,6 +576,18 @@
   function shortUrl(u) {
     try { var x = new URL(u); return x.hostname.replace(/^www\./, "") + (x.pathname !== "/" ? x.pathname : ""); }
     catch (e) { return u; }
+  }
+
+  function sourceHtml(value) {
+    var text = String(value || "").trim();
+    var match = text.match(/https?:\/\/[^\s]+/i);
+    if (!match) return esc(text);
+    var href = safeUrl(match[0]);
+    if (!href) return esc(text);
+    var start = match.index || 0;
+    var end = start + match[0].length;
+    return esc(text.slice(0, start)) + '<a href="' + esc(href) +
+      '" target="_blank" rel="noopener">' + esc(shortUrl(href)) + "</a>" + esc(text.slice(end));
   }
 
   function refreshDetailIfOpen() {
@@ -537,11 +719,18 @@
     el["f-save"].disabled = true;
     try {
       var saved;
-      if (state.editingId) saved = await store.update(state.editingId, payload, state.editUpdatedAt);
+      var wasCreating = !state.editingId;
+      if (!wasCreating) saved = await store.update(state.editingId, payload, state.editUpdatedAt);
       else saved = await store.create(payload);
       closeSheet("form");
       SO.toast("Gespeichert.", "ok");
-      if (saved && saved.id) openDetail(saved.id);
+      if (saved && saved.id) {
+        // Neue eigene Einträge gehören immer zu „Aktiv". Wird einer aus dem
+        // Vorschlags- oder Archiv-Pool angelegt, dorthin wechseln, bevor das
+        // Detail geöffnet wird.
+        if (wasCreating && state.pool !== "aktiv") setPool("aktiv");
+        openDetail(saved.id);
+      }
     } catch (e) {
       if (e && e.conflict) {
         // Gleichzeitige Fremdänderung: NICHTS überschreiben. Frische Werte holen
@@ -762,7 +951,13 @@
     if (prev) prev.classList.remove("is-selected");
     var row = el.rows.querySelector('.row[data-id="' + cssEscape(id) + '"]');
     if (row) row.classList.add("is-selected");
-    if (mapInited) { SO.map.select(id); SO.map.flyTo(id); }
+    if (mapInited) {
+      SO.map.select(id);
+      // Auf Mobile ist die Karte in der Listenansicht display:none. Leaflet kann
+      // in einem 0×0-Container keine gültige Projektion berechnen; der Detail-
+      // Aufruf würde sonst vor dem Öffnen des Sheets abbrechen.
+      if (el.map.offsetWidth > 0 && el.map.offsetHeight > 0) SO.map.flyTo(id);
+    }
   }
   function cssEscape(s) { return String(s).replace(/["\\]/g, "\\$&"); }
 
@@ -775,21 +970,29 @@
     el.tabs.forEach(function (t) {
       var tv = t.dataset.tab;
       var on = (tv === "map" && view === "map") ||
-        (tv === "list" && view === "list" && !state.archiv) ||
-        (tv === "archiv" && view === "list" && state.archiv);
+        (tv === "list" && view === "list" && state.pool === "aktiv") ||
+        (tv === "vorschlag" && view === "list" && state.pool === "vorschlag") ||
+        (tv === "archiv" && view === "list" && state.pool === "archiv");
       t.setAttribute("aria-current", on ? "true" : "false");
     });
+    var listMode = view === "list";
+    el.btnListMode.setAttribute("aria-pressed", listMode ? "true" : "false");
+    el.btnListMode.querySelector("span").textContent = listMode ? "Karte zeigen" : "Liste gross";
     if (view === "map" && mapInited) SO.map.invalidate();
   }
 
-  function setArchiv(on) {
-    state.archiv = on;
+  function setPool(pool) {
+    if (["aktiv", "vorschlag", "archiv"].indexOf(pool) === -1) return;
+    state.pool = pool;
     el.segBtns.forEach(function (b) {
-      var v = b.dataset.archiv === "1";
-      b.classList.toggle("is-on", v === on);
-      b.setAttribute("aria-selected", v === on ? "true" : "false");
+      var on = b.dataset.pool === pool;
+      b.classList.toggle("is-on", on);
+      b.setAttribute("aria-selected", on ? "true" : "false");
     });
+    if (state.openSheet === "detail") closeSheet("detail");
+    else clearSelection();
     render(); // Liste UND Karte auffrischen (gleiche Filterquelle)
+    setView(state.view);
   }
 
   // ============================================================================
@@ -889,31 +1092,51 @@
       state.search = this.value.trim().toLowerCase();
       render();
     });
+    // Shop-artige Facetten: Land, Art und Status lassen sich unabhängig und
+    // jeweils mehrfach auswählen. Sortierung bleibt separat.
+    el.countryOptions.addEventListener("change", function (ev) {
+      var input = ev.target.closest('input[data-country]');
+      if (!input) return;
+      if (input.checked) state.countries.add(input.dataset.country);
+      else state.countries.delete(input.dataset.country);
+      render();
+    });
+    el.filterClear.addEventListener("click", function () {
+      state.countries.clear();
+      state.cats = new Set(SO.CATEGORIES);
+      state.statuses = new Set(FILTER_STATUSES);
+      render();
+    });
+    document.addEventListener("click", function (ev) {
+      if (el.filterMenu.open && !el.filterMenu.contains(ev.target)) el.filterMenu.open = false;
+    });
     // Sortierung
     el.sort.addEventListener("change", function () { state.sort = this.value; renderList(); });
 
-    // Kategorie-Chips
-    el.catFilters.addEventListener("click", function (ev) {
-      var b = ev.target.closest(".chip"); if (!b) return;
-      var cat = b.dataset.cat;
-      if (state.cats.has(cat)) { state.cats.delete(cat); b.classList.remove("is-on"); }
-      else { state.cats.add(cat); b.classList.add("is-on"); }
+    // Kategorie-Facette
+    el.catFilters.addEventListener("change", function (ev) {
+      var input = ev.target.closest("input[data-cat]"); if (!input) return;
+      if (input.checked) state.cats.add(input.dataset.cat);
+      else state.cats.delete(input.dataset.cat);
       render();
     });
-    // Status-Chips
-    el.statusFilters.addEventListener("click", function (ev) {
-      var b = ev.target.closest(".chip"); if (!b) return;
-      state.status = b.dataset.status;
-      el.statusChips.forEach(function (c) { c.classList.toggle("is-on", c === b); });
+    // Status-Facette (Mehrfachauswahl)
+    el.statusFilters.addEventListener("change", function (ev) {
+      var input = ev.target.closest("input[data-status]"); if (!input) return;
+      if (input.checked) state.statuses.add(input.dataset.status);
+      else state.statuses.delete(input.dataset.status);
       render();
     });
-    // Archiv-Umschalter (Desktop)
+    // Pool-Umschalter (Desktop)
     el.archivToggle.addEventListener("click", function (ev) {
       var b = ev.target.closest(".seg-btn"); if (!b) return;
-      setArchiv(b.dataset.archiv === "1");
+      setPool(b.dataset.pool);
     });
     // Add-Button (Desktop)
     el.btnAddDesktop.addEventListener("click", function () { openForm(null); });
+    el.btnListMode.addEventListener("click", function () {
+      setView(state.view === "list" ? "map" : "list");
+    });
 
     // Deadline-Zeilen
     el.deadlineTags.addEventListener("click", function (ev) {
@@ -938,9 +1161,10 @@
       t.addEventListener("click", function () {
         var tab = t.dataset.tab;
         if (tab === "add") { openForm(null); return; }
-        if (tab === "map") { setArchiv(false); setView("map"); }
-        else if (tab === "list") { setArchiv(false); setView("list"); }
-        else if (tab === "archiv") { setArchiv(true); setView("list"); }
+        if (tab === "map") { setView("map"); }
+        else if (tab === "list") { setPool("aktiv"); setView("list"); }
+        else if (tab === "vorschlag") { setPool("vorschlag"); setView("list"); }
+        else if (tab === "archiv") { setPool("archiv"); setView("list"); }
       });
     });
 
@@ -951,6 +1175,18 @@
     });
     document.addEventListener("keydown", function (ev) {
       if (ev.key === "Escape" && state.openSheet) closeSheet(state.openSheet);
+      else if (ev.key === "Escape" && el.filterMenu.open) el.filterMenu.open = false;
+      if (ev.key === "Tab" && state.openSheet) {
+        var activeSheet = state.openSheet === "form" ? el.form : el.detail;
+        if (activeSheet.getAttribute("aria-modal") !== "true") return;
+        var focusable = Array.prototype.slice.call(activeSheet.querySelectorAll(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )).filter(function (node) { return node.offsetWidth > 0 || node.offsetHeight > 0; });
+        if (!focusable.length) return;
+        var first = focusable[0], last = focusable[focusable.length - 1];
+        if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+        else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+      }
     });
 
     // Detail-Aktionen (Delegation)
@@ -997,8 +1233,12 @@
       setAuthMsg("");
     });
     el.btnLogout.addEventListener("click", async function () {
-      await store.signOut();
-      SO.toast("Abgemeldet.", "ok");
+      try {
+        await store.signOut();
+        SO.toast("Abgemeldet.", "ok");
+      } catch (e) {
+        SO.toast(e.message || "Abmelden fehlgeschlagen.", "error");
+      }
     });
 
     // Verbindungsfehler: „Erneut versuchen" lädt die Seite neu.
@@ -1030,6 +1270,44 @@
           Array.prototype.forEach.call(switchBtns, function (x) { x.disabled = false; });
         }
       }
+    } else if (act === "save-note" && e) {
+      var noteField = $("quickNote");
+      if (!noteField || b.disabled) return;
+      b.disabled = true;
+      try {
+        await store.update(id, { note: noteField.value.trim() }, e.updated_at || null);
+        SO.toast("Notiz gespeichert.", "ok");
+        refreshDetailIfOpen();
+      } catch (err) {
+        if (err && err.conflict) {
+          SO.toast("Von der anderen Person geändert — Notiz nicht gespeichert", "error");
+          try { await store.refetch(); } catch (_) {}
+          refreshDetailIfOpen();
+        } else {
+          SO.toast(err.message || "Notiz konnte nicht gespeichert werden.", "error");
+          b.disabled = false;
+        }
+      }
+    } else if (act === "adopt" && e && e.is_suggestion && !e.archived) {
+      if (b.disabled) return;
+      b.disabled = true;
+      try {
+        // Vorschläge sind normale Einträge mit einem Flag. Der Versionsstempel
+        // verhindert, dass eine parallel bearbeitete Recherche still übernommen
+        // wird. Nach Erfolg verschwindet sie aus der aktuellen Warteschlange.
+        await store.update(id, { is_suggestion: false }, e.updated_at || null);
+        SO.toast("Übernommen – jetzt unter Aktiv.", "ok");
+        closeSheet("detail");
+      } catch (err) {
+        if (err && err.conflict) {
+          SO.toast("Von der anderen Person geändert — aktualisiert", "error");
+          try { await store.refetch(); } catch (_) {}
+          refreshDetailIfOpen();
+        } else {
+          SO.toast(err.message || "Übernehmen fehlgeschlagen.", "error");
+          b.disabled = false;
+        }
+      }
     } else if (act === "edit" && e) {
       openForm(e);
     } else if (act === "editpos" && e) {
@@ -1049,7 +1327,10 @@
       try {
         // setArchived gibt intern den aktuellen updated_at mit (Lost-Update-Schutz).
         await store.setArchived(id, !wasArchived);
-        SO.toast(wasArchived ? "Wiederhergestellt." : "Archiviert.", "ok");
+        var archiveMessage = wasArchived ?
+          (e.is_suggestion ? "Zurück zu den Vorschlägen." : "Wiederhergestellt.") :
+          (e.is_suggestion ? "Vorschlag verworfen." : "Archiviert.");
+        SO.toast(archiveMessage, "ok");
         closeSheet("detail");
       } catch (err) {
         if (err && err.conflict) {
@@ -1062,8 +1343,20 @@
       }
     } else if (act === "delete" && e) {
       if (!confirm("„" + e.name + "“ endgültig löschen?")) return;
-      try { await store.remove(id); SO.toast("Gelöscht.", "ok"); closeSheet("detail"); }
-      catch (err) { SO.toast(err.message, "error"); }
+      try {
+        var removed = await store.remove(id, e.updated_at || null);
+        closeSheet("detail");
+        if (removed && removed.cleanupWarning) SO.toast("Eintrag gelöscht. " + removed.cleanupWarning, "error");
+        else SO.toast("Gelöscht.", "ok");
+      } catch (err) {
+        if (err && err.conflict) {
+          SO.toast("Von der anderen Person geändert — nicht gelöscht", "error");
+          try { await store.refetch(); } catch (_) {}
+          refreshDetailIfOpen();
+        } else {
+          SO.toast(err.message, "error");
+        }
+      }
     } else if (act === "att-open") {
       var att = detailAtts[b.dataset.id];
       if (att) {

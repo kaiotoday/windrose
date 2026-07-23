@@ -16,15 +16,19 @@ lokal im Browser mit Beispieldaten.
 ## Was kann die App?
 
 - **Karte + Liste** mit Umschalten (unten die Tab-Leiste am Handy, nebeneinander am Laptop).
-- **Marker nach Kategorie** eingefärbt (Festival, Markt, Messe, Sonstiges) mit
-  Ring-Markierung für dringende Fristen (diesen Monat = orange, abgelaufen = rot).
-- **Detail-Ansicht** je Eintrag mit allen Infos, Status ändern, Bearbeiten,
-  Archivieren, Löschen sowie „In Google/Apple Maps öffnen".
+- **Marker mit Farbe und Kategorie-Icon** (Festival, Markt, Messe, Sonstiges),
+  damit man sie auch ohne Farblegende erkennt.
+- **Detail-Ansicht** je Eintrag mit klar gruppierten Infos, direkt bearbeitbarer
+  Notiz, Status, Bearbeiten, Archivieren und „In Google/Apple Maps öffnen".
 - **Neuer Eintrag** mit drei Wegen, die Position zu setzen: Ort suchen,
   auf der Karte tippen oder einen Maps-Link / Koordinaten einfügen.
-- **Filter** nach Kategorie, Status und freier Suche; Sortierung nach Deadline,
-  Termin oder Name; ein Streifen „Nächste Deadlines" ganz oben.
-- **Archiv** mit Wiederherstellen.
+- **Shop-artiges Filtermenü** mit aufklappbarer Mehrfachauswahl für Länder,
+  Arten und Status samt Trefferzahlen. Die Sortierung nach Land, Deadline,
+  Termin oder Name bleibt bewusst separat.
+- **Aktiv · Zu kuratieren · Archiv**: recherchierte Kandidaten zuerst prüfen,
+  dann übernehmen oder verwerfen. Vorschläge stören die aktive Deadline-Liste nicht.
+- **Grosse Listenansicht** am Laptop; beim Öffnen eines Ortes bleibt die Liste
+  links und die Beschreibung steht fest rechts.
 - **Geteilt in Echtzeit**: Änderungen der anderen Person erscheinen live (mit Supabase).
 - **Anhänge**: PDFs/Bilder pro Eintrag (nur mit Supabase).
 - **Zum Homescreen** hinzufügbar (eigener Name + Icon).
@@ -88,16 +92,21 @@ Ohne diesen Schritt läuft die App im Demo-Modus. Für den geteilten Betrieb:
 2. Im Supabase-Dashboard **SQL Editor** öffnen und den Inhalt von
    **`db/setup.sql`** einfügen und ausführen. Das legt Tabellen, Sicherheits-Regeln
    (RLS), den Storage-Bucket und Realtime an. (Kann gefahrlos mehrfach laufen.)
-3. Danach **`db/seed.sql`** ausführen — das füllt die ~30 Beispiel-Standorte ein.
+3. Danach **`db/seed.sql`** ausführen — das füllt die 83 kuratierten Standorte ein.
    (Auch mehrfach ausführbar; bestehende Einträge werden nicht überschrieben.)
-4. **E-Mails freischalten:** Ganz unten in `db/setup.sql` stehen drei
+4. Für die Recherche-Warteschlange danach **`db/suggestions.sql`** ausführen —
+   sie enthält 223 bereinigte Vorschläge aus 24 Ländern. Bei einem Upgrade einer
+   bereits bestehenden Datenbank vorher einmal
+   **`db/patch-2026-07-23-kuratieren.sql`** ausführen. Details und Reihenfolge:
+   **`db/README-kuratieren.md`**.
+5. **E-Mails freischalten:** Ganz unten in `db/setup.sql` stehen drei
    auskommentierte Zeilen. Tragt dort eure echten E-Mail-Adressen ein
    (klein geschrieben), Kommentarzeichen `--` entfernen und diese Zeilen im
    SQL Editor ausführen. Nur freigeschaltete Adressen haben Zugriff.
-5. **Zugangsdaten holen:** In Supabase unter **Project Settings → API**:
+6. **Zugangsdaten holen:** In Supabase unter **Project Settings → API**:
    - **Project URL** (z.B. `https://abcxyz.supabase.co`)
    - **anon public** Key
-6. Diese beiden Werte in **`config.js`** eintragen:
+7. Diese beiden Werte in **`config.js`** eintragen:
 
    ```js
    window.STANDORT_CONFIG = {
@@ -106,7 +115,7 @@ Ohne diesen Schritt läuft die App im Demo-Modus. Für den geteilten Betrieb:
    };
    ```
 
-7. `config.js` committen und pushen (GitHub Desktop). Fertig — beim nächsten
+8. `config.js` committen und pushen (GitHub Desktop). Fertig — beim nächsten
    Öffnen erscheint ein **Login** (E-Mail eingeben → **Anmelde-Link** in der Mail
    auf demselben Gerät anklicken). Danach seht ihr beide dieselben, live geteilten Daten.
 
@@ -183,9 +192,17 @@ app.js                         UI, Filter, Detail, Formular, Login
 manifest.json + icon.svg       „Zum Homescreen"-Icon & -Name
 db/setup.sql                   Supabase-Schema, RLS, Storage, Realtime
 db/seed.sql                    Beispieldaten fürs SQL-Setup
+db/suggestions.sql             223 Vorschläge zum Prüfen
+db/suggestions-review.md       Lesbare Rechercheübersicht nach Ländern
+scripts/generate-seed-sql.js   Erzeugt db/seed.sql aus seed.js
+scripts/curate-claude-suggestions.js  Prüft/bereinigt den Rechercheimport
 .github/workflows/keepalive.yml Wöchentlicher Supabase-Ping
 studio_arno_vertrieb-7.html    Ursprünglicher Prototyp (nur Referenz)
 ```
 
 Der Prototyp `studio_arno_vertrieb-7.html` bleibt als Referenz liegen und wird
 von der App nicht verwendet.
+
+Wer `seed.js` redaktionell ergänzt, erzeugt die passende SQL-Datei danach mit
+`node scripts/generate-seed-sql.js`. Das Skript prüft dabei UUIDs, Slugs,
+Kategorien, Koordinaten, Datumsfelder, Links und doppelte Einträge.
