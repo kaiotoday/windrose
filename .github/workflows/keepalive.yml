@@ -30,9 +30,10 @@ jobs:
             echo "SUPABASE_URL (Variable) oder SUPABASE_ANON_KEY (Secret) fehlt — übersprungen."
             exit 0
           fi
-          # REST-Wurzel: liefert für den anon-Key eine 2xx-Antwort, ohne dass
-          # anon Tabellenzugriff braucht (RLS/Grants lassen anon nichts lesen).
-          url="${SUPABASE_URL%/}/rest/v1/"
+          # Auth-Health-Endpunkt: liefert garantiert 200, ohne Tabellenzugriff.
+          # (/rest/v1/ antwortet dem anon-Key auf diesem Projekt mit 401, weil
+          # anon per REVOKE komplett ausgesperrt ist — darum NICHT die REST-Wurzel.)
+          url="${SUPABASE_URL%/}/auth/v1/health"
           echo "Pinge ${url}"
 
           ping() {

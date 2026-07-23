@@ -41,7 +41,9 @@
         <div id="auth-step-code" hidden>
           <p id="auth-sent-text" class="auth-sent-text">Wir haben dir einen Anmelde-Link geschickt. Öffne die Mail auf diesem Gerät und klicke den Link — du wirst automatisch angemeldet.</p>
           <div class="auth-alt">
-            <button type="button" id="auth-code-toggle" class="btn btn-ghost btn-sm btn-block">Stattdessen Code eintippen</button>
+            <!-- Code-Weg bewusst deaktiviert (nur Magic-Link): Die Logik bleibt
+                 als versteckter Fallback erhalten, es gibt aber keinen Toggle
+                 mehr, der sie einblendet. -->
             <div id="auth-code-fallback" hidden>
               <label for="auth-code">Code aus der E-Mail</label>
               <input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="123456" />

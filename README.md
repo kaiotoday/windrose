@@ -122,10 +122,13 @@ Supabase schickt eine Mail mit einem Link → diesen Link **auf demselben Gerät
 öffnen, und die App meldet einen automatisch an (supabase-js liest die Session
 aus der zurückkehrenden URL und räumt die Adresszeile danach auf).
 
-Der **eingebaute Supabase-Mailer** nutzt ausschließlich die **Standard-Vorlagen**.
-Eigene Vorlagen — etwa mit einem 6-stelligen `{{ .Token }}`-Code — sind **nur mit
-eigenem SMTP-Absender** möglich; das wird hier **bewusst nicht** genutzt. Deshalb
-kommt ein **Link** und **kein Code**.
+Der Versand läuft über einen **eigenen SMTP-Absender (Resend)** — eingerichtet
+unter **Authentication → Emails → Enable custom SMTP** (Host `smtp.resend.com`,
+Port `465`, Username `resend`, Passwort = Resend-API-Key). Damit sind eigene
+Mail-Vorlagen möglich: In **Authentication → Email Templates** steckt in
+**„Confirm signup"** UND **„Magic Link"** dieselbe Vorlage aus
+[`db/email-template.html`](db/email-template.html) (Windrose-Look, nur
+Anmelde-Button, kein Code), Betreff `Anmelden bei Windrose`.
 
 **Einzige nötige Einstellung:** Unter **Authentication → URL Configuration** die
 **Site URL** auf eure GitHub-Pages-Adresse setzen
@@ -133,12 +136,11 @@ kommt ein **Link** und **kein Code**.
 Leere. Die App gibt beim Anmelden zusätzlich die aktuelle Seiten-URL als
 `emailRedirectTo` mit.
 
-> Das **Code-Eingabefeld** in der App bleibt als **Fallback** erhalten (kleiner
-> Link „Stattdessen Code eintippen"). Es greift nur, falls ihr später einen
-> **eigenen SMTP-Absender** mit Code-Vorlage einrichtet — im Standardbetrieb wird
-> es nicht gebraucht. Ein eigener SMTP-Absender (unter
-> **Authentication → Providers → Email**) erhöht zugleich die niedrigen
-> Sende-Limits des geteilten Test-Mailers.
+> Der **Code-Weg ist bewusst deaktiviert** — es gibt nur den Magic-Link. Die
+> Code-Logik liegt noch versteckt im Code (`#auth-code-fallback` in
+> `index.html`), falls sie je wieder gebraucht wird: Toggle-Button wieder
+> einbauen und `{{ .Token }}` in die Mail-Vorlage aufnehmen, mehr braucht es
+> nicht.
 
 **Neue Konten sperren (empfohlen):** In `config.js` steht `shouldCreateUser: true`,
 damit sich Leandra und Arno **das erste Mal** anmelden (und ihr Konto entsteht)
